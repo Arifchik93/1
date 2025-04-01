@@ -9,7 +9,7 @@
       {"name": "Добавить комментарий", "text": "\nКомментарий: "}
     ],
     "singleLineTextInput8": [
-      {"name": "Вставить дату", "text": " (дата: " + new Date().toLocaleDateString() + ")"}
+      {"name": "Вставить дату", "text": " (дата: {current_date})"}
     ]
   }
 }
