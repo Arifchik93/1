@@ -10,6 +10,19 @@
     ],
     "singleLineTextInput8": [
       {"name": "Вставить дату", "text": " (дата: {current_date})"}
+    ],
+    "multiple": [
+      {
+        "name": "Комплексное заполнение",
+        "fields": ["multiLineTextDiv3", "singleLineTextInput8"],
+        "text": "\nКомплексное заполнение: выполнено {current_date}"
+      },
+      {
+        "name": "Сбросить все поля",
+        "fields": ["multiLineTextDiv5", "multiLineTextDiv3", "singleLineTextInput8"],
+        "text": "",
+        "clear": true
+      }
     ]
   }
 }
