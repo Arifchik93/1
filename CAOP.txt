@@ -27,20 +27,6 @@
       {"name": "Вставить дату", "text": " (дата: {current_date})"}
     ],
     
-    "multiple": [
-      {
-        "name": "ТАБ ЩЖ слева",
-        "fields": {
-          "multiLineTextDiv3": "\nТекст для первого поля",
-          "singleLineTextInput8": "\nТекст для второго поля"
-        }
-      },
-      {
-        "name": "Шаблон отчета",
-        "fields": {
-           "multiLineTextDiv6": "Активно не предъявляет", 
-        }
-      }
-    ]
+   
   }
 }
