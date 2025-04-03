@@ -11,17 +11,22 @@
     "singleLineTextInput8": [
       {"name": "Вставить дату", "text": " (дата: {current_date})"}
     ],
+    
     "multiple": [
       {
         "name": "Комплексное заполнение",
-        "fields": ["multiLineTextDiv3", "singleLineTextInput8"],
-        "text": "\nКомплексное заполнение: выполнено {current_date}"
+        "fields": {
+          "multiLineTextDiv3": "\nТекст для первого поля",
+          "singleLineTextInput8": "\nТекст для второго поля"
+        }
       },
       {
-        "name": "Сбросить все поля",
-        "fields": ["multiLineTextDiv5", "multiLineTextDiv3", "singleLineTextInput8"],
-        "text": "",
-        "clear": true
+        "name": "Шаблон отчета",
+        "fields": {
+          "multiLineTextDiv5": "\n--- ОТЧЕТ ---\nДата: {current_date}",
+          "multiLineTextDiv3": "\nСтатус: завершено",
+          "singleLineTextInput8": "Отчетный период"
+        }
       }
     ]
   }
