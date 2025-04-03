@@ -53,11 +53,15 @@
         }
       },
       {
-        "name": "Шаблон отчета",
+        "name": "ТАБ Слева",
         "fields": {
-          "multiLineTextDiv5": "\n--- ОТЧЕТ ---\nДата: {current_date}",
-          "multiLineTextDiv3": "\nСтатус: завершено",
-          "singleLineTextInput8": "Отчетный период"
+          "multiLineTextDiv5": "E04.2 многоузловой зоб ",
+          "multiLineTextDiv3": "ЩЖ увелиена слева",
+          "singleLineTextInput8": "чистые позозрительныз образований нет",
+          "multiLineTextDiv3": "наблюдается у эндокринолога ... 
+направлен для исключеняи ЗНО. "
+
+
         }
       }
     ]
