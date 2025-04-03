@@ -38,23 +38,7 @@
       {
         "name": "Шаблон отчета",
         "fields": {
-           "multiLineTextDiv6": "Активно не предъявляет", // Жалобы
-  "multiLineTextDiv1": "", // Анамнез заболевания
-  "multiLineTextDiv2": "", // Анамнез жизни
-  "singleLineTextInput4": "", // Пульс
-  "singleLineTextInput5": "", // Систолическое давление
-  "singleLineTextInput10": "", // Диастолическое давление
-  "singleLineTextInput6": "", // Рост
-  "singleLineTextInput9": "", // Вес
-  "singleLineTextInput1": "", // Температура тела
-  "singleLineTextInput2": "", // Сатурация
-  "singleLineTextInput7": "", // ЧДД
-  "singleLineTextInput8": "", // Описание кожного покрова тела
-  "rcMKBinput1": "", // Состояние пациента
-  "multiLineTextDiv3": "", // Объективно
-  "multiLineTextDiv5": "", // Заключение
-  "multiLineTextDiv4": "", // Рекомендации
-  "singleLineTextInput3": "" // Для предоставления в
+           "multiLineTextDiv6": "Активно не предъявляет", 
         }
       }
     ]
