@@ -51,6 +51,15 @@
           "multiLineTextDiv3": "\nТекст для первого поля",
           "singleLineTextInput8": "\nТекст для второго поля"
         }
+      },
+      {
+        "name": "ТАБ Слева",
+        "fields": {
+          "multiLineTextDiv5": "E04.2 многоузловой зоб ",
+          "multiLineTextDiv3": "ЩЖ увелиена слева",
+          "singleLineTextInput8": "чистые позозрительныз образований нет",
+          "multiLineTextDiv3": "наблюдается у эндокринолога ... направлен для исключеняи ЗНО. " 
+        }
       }
     ]
   }
