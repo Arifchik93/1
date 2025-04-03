@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>ТрастМед:Шаблон</title>
+    <meta name="generator" content="LibreOffice">
+    <style type="text/css">
+        @page { 
+            size: A4;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.2;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        td, th {
+            border: 1px solid #000;
+            padding: 5px;
+            vertical-align: top;
+        }
+        .header {
+            text-align: center;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        .section-title {
+            font-weight: bold;
+            margin: 10px 0 5px 0;
+        }
+        .signature-line {
+            margin-top: 30px;
+            border-top: 1px solid #000;
+            width: 50%;
+        }
+        ol {
+            padding-left: 20px;
+        }
+        p {
+  margin: 0;
+  padding: 0;
+} li  {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body lang="ru-RU">
+
+<table>
+    <tbody><tr>
+        <td width="50%">Код формы ОКУД</td>
+        <td width="50%"></td>
+    </tr>
+    <tr>
+        <td>Код учреждения ОКПО</td>
+        <td></td>
+    </tr>
+</tbody></table><table>
+    <tbody><tr>
+        <td width="50%">
+            Министерство Здравоохранения Российской Федерации<br>
+            Код учреждения по ОКПО
+        </td>
+        <td width="50%">
+            Медицинская документация<br>
+            Форма №203/у-02<br>
+            Утвержден приказом Минздрава России от 24.04.2003 г. №174
+        </td>
+    </tr>
+</tbody></table><div class="header">
+    Министерство Здравоохранения Российской Федерации<br>
+    БУЗ Орловской области «Городская больница им. С.П. Боткина»
+</div>
+
+<h2 align="center">НАПРАВЛЕНИЕ<br>на цитологическое диагностическое исследование</h2>
+
+
+
+
+
+<p><strong>ПЕРВИЧНО / ПОВТОРНО</strong></p>
+
+<ol>
+    <li><strong>Кабинет ЦАОП</strong></li>
+    <li><strong>Лечащий врач</strong> {gostValue7}</li>
+    <li><strong>ФИО больного</strong> {gostValue1}</li>
+    <li><strong>Дата рождения</strong> {gostValue3} <strong>Пол</strong> мужской / женский</li>
+    <li><strong>№ страхового полиса</strong> {gostValue4}</li>
+    <li><strong>Диагноз Код по МКБ-10</strong> {multiLineTextDiv5}</li>
+    <li><strong>Краткий анамнез и важнейшие симптомы</strong><br>
+        {multiLineTextDiv1}</li>
+    <li><strong>Локально</strong><br>
+        {multiLineTextDiv3}</li>
+    <li><strong>Проведенное лечение (оперативное, лучевое, химиотерапия; доза, дата начала и окончания лечения).</strong></li>
+    <li><strong>Локализация процесса и способ получения материала</strong><br>
+        {multiLineTextDiv5}</li>
+    <li><strong>Объем и макроскопическое описание биологического материала, маркировка препаратов</strong><br>
+        2 сп</li>
+    <li><strong>Дата взятия биологического материала</strong> {gostValue2}</li>
+</ol>
+
+<p><strong>Ф.И.О. врача, направившего материал</strong> {gostValue7}</p>
+
+<div class="signature-line">Подпись врача</div>
+
+<ol start="13">
+    <li><strong>Объем и макроскопическое описание доставленного биологического материала (заполняется в лаборатории):</strong></li>
+</ol><p>__________________________________________________________________________________________________
+</p>
+
+
+
+<h3>Патологоанатомическое отделение</h3>
+<p>Результат цитологического исследования №_________________</p>
+
+
+
+<p>__________________________________________________________________________________________________ __________________________________________________________________________________________________ __________________________________________________________________________________________________ __________________________________________________________________________________________________
+__________________________________________________________________________________________________ 
+</p><div style="margin-bottom: 10px;">
+  <div><strong>Дата поступления материала:</strong></div>
+</div>
+
+<div style="margin-bottom: 10px;">
+  <div><strong>Дата проведения исследования:</strong></div>
+</div>
+
+
+
+<div style="margin-bottom: 10px;">
+  <div><strong>Ф.И.О. врача, проводившего исследование:</strong></div>
+</div>
+
+<div style="margin-bottom: 10px;">
+  <div><strong>Подпись:</strong></div>
+</div>
+
+
+</body></html>
