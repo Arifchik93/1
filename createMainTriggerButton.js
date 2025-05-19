@@ -1,3 +1,13 @@
+// ==UserScript==
+// @name         Create Main Trigger Button
+// @namespace    https://github.com/Arifchik93/
+// @version      1.0
+// @description  Скрипт для создания кнопки триггера
+// @author       Arifchik93
+// @match       https://template.softrust.ru/Editor/Preview/*  // Укажите сайт, где должен работать скрипт!
+// @grant        none
+// ==/UserScript==
+
 // Главная кнопка для запуска скрипта
 function createMainTriggerButton() {
   const buttonsContainer = document.createElement('div');
