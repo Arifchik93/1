@@ -1,0 +1,116 @@
+<html lang="ru"><head>
+    <meta charset="UTF-8">
+    <title>Медицинские документы</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            line-height: 0.6;
+        }
+        .document-container {
+            height: 50vh;
+            margin-bottom: 15px;
+            page-break-after: always;
+        }
+        .protocol-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .epicriz-title {
+            text-align: center;
+            font-weight: bold;
+             margin-top: 10px; margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .section {
+             margin-top: 10px; margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .underline {
+            border-bottom: 1px solid black;
+            display: inline-block;
+            min-width: 200px;
+        }
+        .underline-space {
+            border-bottom: 1px solid #000;
+            display: inline-block;
+            min-width: 150px;
+            margin-left: 5px;
+        }
+        .signature-line {
+            margin-top: 15px;
+        }
+        hr {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Протокол заседания подкомиссии -->
+    <div class="document-container">
+        <div class="protocol-title">
+            <h3>Протокол заседания подкомиссии ВК (ЭВН, МСЭ) № ______</h3>
+            <p>от «___» ______ 202 ___ г.</p>
+        </div>
+
+        <div class="section">
+            <p>Ф.И.О. пациента {gostValue1} </p>
+            <p>Диагноз  {multiLineTextDiv5}</p>
+        </div>
+
+        <hr>
+
+        <div class="section">
+            <p>Динамика состояния (улучшилось, ухудшилось, без динамики) {multiLineTextDiv6} </p>
+            <hr><hr><hr>
+        </div>
+
+        <div class="section">
+            <p>Лечение (продолжить, нуждается в коррекции)</p>
+            
+            
+            <p>{multiLineTextDiv5}</p>
+            <p>Решение врачебной подкомиссии </p>
+            <hr><hr><hr><hr>
+        </div>
+
+        <div class="signature-line">
+            <p>Председатель врачебной подкомиссии ______</p>
+            <p>Члены врачебной подкомиссии ______</p>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Этапный эпикриз -->
+    <div class="document-container">
+        <div class="epicriz-title">Этапный эпикриз</div>
+
+        <div class="section">
+            Дата {gostValue2} <div class="section">
+            Жалобы и динамика состояния {multiLineTextDiv6}  
+        </div></div>
+
+        <div class="section">
+            Проведенное обследование и лечение {multiLineTextDiv1}<span class="underline-space"></span>
+        </div>
+
+        <div class="section">
+            Диагноз основного заболевания: код по МКБ-10 {multiLineTextDiv5}<br>
+        </div>
+
+        <div class="section">
+            Рекомендации {multiLineTextDiv5} <span class="underline-space"></span>
+        </div>
+
+        
+
+        <div class="signature-line">Врач __________________/ {gostValue7}/.  Зав отделением <span class="underline-space"></span>
+        </div>
+    </div>
+
+
+</body></html>
