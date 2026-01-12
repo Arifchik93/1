@@ -50,11 +50,20 @@
    
     "multiple": [
       {
-        "name": "Комплексное заполнение",
-        "fields": {
-          "multiLineTextDiv3": "\nТекст для первого поля",
-          "singleLineTextInput8": "\nТекст для второго поля"
-        }
+        "name": "очистить",
+         "fields": {
+        "multiLineTextDiv6": " ",
+        "multiLineTextDiv1": " ",
+        "multiLineTextDiv2": "   ",
+        "singleLineTextInput4": "",
+        "singleLineTextInput5": "",
+        "singleLineTextInput10": "",
+        "singleLineTextInput7": "",
+        "singleLineTextInput8": " ",
+        "multiLineTextDiv3": " ",
+        "multiLineTextDiv5": "  ",
+        "multiLineTextDiv4": "  "
+      }
       },
       {
       "name": "ТАБ левой доли ЩЖ",
