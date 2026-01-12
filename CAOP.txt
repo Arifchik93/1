@@ -50,15 +50,15 @@
    
     "multiple": [
       {
-        "name": "очистить",
+        "name": "очистить всё",
          "fields": {
         "multiLineTextDiv6": " ",
         "multiLineTextDiv1": " ",
         "multiLineTextDiv2": "   ",
-        "singleLineTextInput4": "",
-        "singleLineTextInput5": "",
-        "singleLineTextInput10": "",
-        "singleLineTextInput7": "",
+        "singleLineTextInput4": " ",
+        "singleLineTextInput5": " ",
+        "singleLineTextInput10": " ",
+        "singleLineTextInput7": " ",
         "singleLineTextInput8": " ",
         "multiLineTextDiv3": " ",
         "multiLineTextDiv5": "  ",
