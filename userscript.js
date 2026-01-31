@@ -43,6 +43,9 @@
         ]
     };
 
+    const CONFIG_STORAGE_KEY = 'caopConfigText';
+    let cachedConfigText = null;
+
     // Главная функция инициализации
     function init() {
         console.log('Скрипт инициализирован. Поиск целевой страницы...');
@@ -195,6 +198,12 @@
                 action: toggleAutoButtonsMode
             },
             {
+                text: '📝',
+                color: '#607D8B',
+                title: 'Редактировать CAOP-конфиг',
+                action: () => openConfigEditor()
+            },
+            {
                 text: '🧪',
                 color: '#9C27B0',
                 title: 'Направление на цитологическое исследование',
@@ -313,10 +322,7 @@
     // Загрузка и создание кнопок возле полей
     async function loadAndCreateFieldButtons() {
         try {
-            const response = await fetch(`https://raw.githubusercontent.com/Arifchik93/1/main/CAOP.txt?t=${Date.now()}`);
-            const configText = await response.text();
-            const processedConfig = configText.replace(/{current_date}/g, new Date().toLocaleDateString());
-            const config = JSON.parse(processedConfig);
+            const config = await loadLocalConfig();
 
             processFieldsForButtons(window, config);
 
@@ -410,10 +416,7 @@
     // Создание кнопок из внешней конфигурации (панель инструментов)
     async function createButtonsFromExternalConfig() {
         try {
-            const response = await fetch(`https://raw.githubusercontent.com/Arifchik93/1/main/CAOP.txt?t=${Date.now()}`);
-            const configText = await response.text();
-            const processedConfig = configText.replace(/{current_date}/g, new Date().toLocaleDateString());
-            const config = JSON.parse(processedConfig);
+            const config = await loadLocalConfig();
 
             const tools = document.querySelector('.global-tools-container');
             if (tools) tools.remove();
@@ -546,6 +549,166 @@
         } catch (e) {
             console.error('Ошибка при загрузке конфигурации:', e);
         }
+    }
+
+    async function loadLocalConfig() {
+        const configText = await loadConfigText();
+        const processedConfig = configText.replace(/{current_date}/g, new Date().toLocaleDateString());
+        return JSON.parse(processedConfig);
+    }
+
+    async function loadConfigText() {
+        if (cachedConfigText) return cachedConfigText;
+
+        const storedText = localStorage.getItem(CONFIG_STORAGE_KEY);
+        if (storedText) {
+            cachedConfigText = storedText;
+            return storedText;
+        }
+
+        const response = await fetch('https://raw.githubusercontent.com/Arifchik93/1/main/CAOP.txt');
+        const configText = await response.text();
+        cachedConfigText = configText;
+        localStorage.setItem(CONFIG_STORAGE_KEY, configText);
+        return configText;
+    }
+
+    function saveConfigText(configText) {
+        cachedConfigText = configText;
+        localStorage.setItem(CONFIG_STORAGE_KEY, configText);
+    }
+
+    async function openConfigEditor() {
+        const existing = document.getElementById('configEditorModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'configEditorModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        `;
+
+        const header = document.createElement('div');
+        header.textContent = 'Редактор CAOP-конфига';
+        header.style.cssText = 'font-weight: bold; font-size: 16px;';
+
+        const textarea = document.createElement('textarea');
+        textarea.style.cssText = 'width: 100%; height: 60vh; font-family: monospace; font-size: 12px;';
+        textarea.value = await loadConfigText();
+
+        const buttonsRow = document.createElement('div');
+        buttonsRow.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+
+        const downloadButton = document.createElement('button');
+        downloadButton.textContent = 'Скачать бэкап';
+        downloadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
+        downloadButton.addEventListener('click', () => downloadConfigBackup(textarea.value));
+
+        const uploadButton = document.createElement('button');
+        uploadButton.textContent = 'Загрузить бэкап';
+        uploadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
+        uploadButton.addEventListener('click', () => uploadConfigBackup((text) => {
+            textarea.value = text;
+        }));
+
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Сохранить';
+        saveButton.style.cssText = 'padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;';
+        saveButton.addEventListener('click', () => {
+            try {
+                JSON.parse(textarea.value);
+                saveConfigText(textarea.value);
+                modal.remove();
+                if (CONFIG.autoButtonsMode) {
+                    createButtonsFromExternalConfig();
+                    loadAndCreateFieldButtons();
+                }
+            } catch (e) {
+                alert('Некорректный JSON: ' + e.message);
+            }
+        });
+
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Отмена';
+        cancelButton.style.cssText = 'padding: 8px 16px; background: #777; color: white; border: none; border-radius: 4px; cursor: pointer;';
+        cancelButton.addEventListener('click', () => modal.remove());
+
+        buttonsRow.appendChild(cancelButton);
+        buttonsRow.appendChild(downloadButton);
+        buttonsRow.appendChild(uploadButton);
+        buttonsRow.appendChild(saveButton);
+
+        content.appendChild(header);
+        content.appendChild(textarea);
+        content.appendChild(buttonsRow);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    function downloadConfigBackup(configText = localStorage.getItem(CONFIG_STORAGE_KEY) || '') {
+        const blob = new Blob([configText], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'caop-backup.json';
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function uploadConfigBackup(onLoaded) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,.txt';
+        input.addEventListener('change', () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const text = String(reader.result || '');
+                    JSON.parse(text);
+                    saveConfigText(text);
+                    if (onLoaded) {
+                        onLoaded(text);
+                    }
+                    if (CONFIG.autoButtonsMode) {
+                        createButtonsFromExternalConfig();
+                        loadAndCreateFieldButtons();
+                    }
+                } catch (e) {
+                    alert('Не удалось загрузить бэкап: ' + e.message);
+                }
+            };
+            reader.readAsText(file);
+        });
+        input.click();
     }
 
     // Обновление случайных полей
