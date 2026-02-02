@@ -32,7 +32,13 @@
             'singleLineTextInput10': { type: 'list', values: [70, 75, 80, 85] },
             'singleLineTextInput7': { type: 'range', min: 14, max: 18, step: 1 }
         },
-        autoButtonsMode: localStorage.getItem('autoButtonsMode') === 'true' || false,
+        complexToolsMode: (() => {
+            const storedComplex = localStorage.getItem('complexToolsMode');
+            if (storedComplex !== null) {
+                return storedComplex === 'true';
+            }
+            return localStorage.getItem('autoButtonsMode') === 'true';
+        })(),
         // Целевые признаки для обнаружения правильной страницы
         targetSelectors: [
             '#gostValue11',
@@ -56,11 +62,7 @@
                 console.log('Целевая страница обнаружена. Создание интерфейса...');
                 createMainTriggerButton();
                 updateRandomFields();
-
-                // Загружаем кнопки возле полей при инициализации
-                if (CONFIG.autoButtonsMode) {
-                    loadAndCreateFieldButtons();
-                }
+                loadAndCreateFieldButtons();
             } else {
                 console.log('Целевая страница не обнаружена. Повторная проверка через 2 секунды...');
                 // Повторная проверка через 2 секунды
@@ -68,6 +70,7 @@
                     if (isTargetPage()) {
                         createMainTriggerButton();
                         updateRandomFields();
+                        loadAndCreateFieldButtons();
                     }
                 }, 2000);
             }
@@ -193,9 +196,9 @@
         const buttons = [
             {
                 text: '⚙️',
-                color: CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800',
-                title: CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ',
-                action: toggleAutoButtonsMode
+                color: CONFIG.complexToolsMode ? '#4CAF50' : '#FF9800',
+                title: CONFIG.complexToolsMode ? 'Комплексное меню: ВКЛ' : 'Комплексное меню: ВЫКЛ',
+                action: toggleComplexToolsMode
             },
             {
                 text: '📝',
@@ -292,30 +295,27 @@
         document.body.appendChild(container);
         console.log('Кнопки созданы');
 
-        if (CONFIG.autoButtonsMode) {
+        if (CONFIG.complexToolsMode) {
             createButtonsFromExternalConfig();
         }
     }
 
-    // Переключение режима авто-кнопок
-    function toggleAutoButtonsMode() {
-        CONFIG.autoButtonsMode = !CONFIG.autoButtonsMode;
-        localStorage.setItem('autoButtonsMode', CONFIG.autoButtonsMode.toString());
+    // Переключение режима комплексного меню
+    function toggleComplexToolsMode() {
+        CONFIG.complexToolsMode = !CONFIG.complexToolsMode;
+        localStorage.setItem('complexToolsMode', CONFIG.complexToolsMode.toString());
 
         const toggleBtn = document.querySelector('#mainTriggerButtonsContainer button:first-child');
         if (toggleBtn) {
-            toggleBtn.style.backgroundColor = CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800';
-            toggleBtn.title = CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ';
+            toggleBtn.style.backgroundColor = CONFIG.complexToolsMode ? '#4CAF50' : '#FF9800';
+            toggleBtn.title = CONFIG.complexToolsMode ? 'Комплексное меню: ВКЛ' : 'Комплексное меню: ВЫКЛ';
         }
 
-        if (CONFIG.autoButtonsMode) {
+        if (CONFIG.complexToolsMode) {
             createButtonsFromExternalConfig();
-            loadAndCreateFieldButtons();
         } else {
             const tools = document.querySelector('.global-tools-container');
             if (tools) tools.remove();
-
-            removeFieldButtons();
         }
     }
 
@@ -325,6 +325,7 @@
             const config = await loadLocalConfig();
 
             processFieldsForButtons(window, config);
+            ensureRandomRefreshButton(window);
 
         } catch (e) {
             console.error('Ошибка при загрузке конфигурации для кнопок полей:', e);
@@ -340,7 +341,7 @@
 
                 const element = win.document.getElementById(fieldId);
                 if (element && !element.nextElementSibling?.classList?.contains('field-buttons')) {
-                    createFieldButtonsForElement(element, config.fields[fieldId]);
+                    createFieldButtonsForElement(element, fieldId, config.fields[fieldId]);
                 }
             }
 
@@ -362,36 +363,138 @@
     }
 
     // Создание кнопок для конкретного элемента
-    function createFieldButtonsForElement(element, buttonConfigs) {
+    function createFieldButtonsForElement(element, fieldId, buttonConfigs) {
         const buttonContainer = document.createElement('div');
         buttonContainer.className = 'field-buttons';
         buttonContainer.style.cssText = `
             display: inline-block;
             margin-left: 10px;
             vertical-align: middle;
+            max-width: 420px;
         `;
 
-        buttonConfigs.forEach(buttonConfig => {
-            const button = document.createElement('button');
-            button.textContent = buttonConfig.name;
-            button.style.cssText = `
+        if (Array.isArray(buttonConfigs)) {
+            buttonConfigs.forEach(buttonConfig => {
+                const buttonGroup = createFieldButtonGroup({
+                    element,
+                    fieldId,
+                    buttonConfig
+                });
+                buttonContainer.appendChild(buttonGroup);
+            });
+        }
+
+        if (isMultilineElement(element)) {
+            const addButton = document.createElement('button');
+            addButton.textContent = 'добавить';
+            addButton.style.cssText = `
                 margin: 2px;
                 padding: 3px 6px;
                 font-size: 11px;
                 cursor: pointer;
-                background-color: #e0e0e0;
-                border: 1px solid #ccc;
+                background-color: #4CAF50;
+                color: #fff;
+                border: 1px solid #3e8e41;
                 border-radius: 3px;
             `;
+            addButton.addEventListener('click', async () => {
+                const name = prompt('Введите короткое название кнопки:');
+                if (!name) return;
+                const text = prompt('Введите значение для вставки:');
+                if (text === null) return;
+                const newButton = { name: name.trim(), text };
+                if (!newButton.name) return;
 
-            button.addEventListener('click', () => {
-                insertText(element, buttonConfig.text);
+                await addFieldButtonToConfig(fieldId, newButton);
+                const buttonGroup = createFieldButtonGroup({
+                    element,
+                    fieldId,
+                    buttonConfig: newButton
+                });
+                buttonContainer.insertBefore(buttonGroup, addButton);
             });
-
-            buttonContainer.appendChild(button);
-        });
+            buttonContainer.appendChild(addButton);
+        }
 
         element.insertAdjacentElement('afterend', buttonContainer);
+    }
+
+    function createFieldButtonGroup({ element, fieldId, buttonConfig }) {
+        const wrapper = document.createElement('span');
+        wrapper.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            margin: 2px;
+            gap: 4px;
+        `;
+
+        const button = document.createElement('button');
+        button.textContent = buttonConfig.name;
+        button.style.cssText = `
+            padding: 3px 6px;
+            font-size: 11px;
+            cursor: pointer;
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        `;
+
+        button.addEventListener('click', () => {
+            insertText(element, buttonConfig.text);
+        });
+
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = '×';
+        deleteButton.title = 'Удалить кнопку';
+        deleteButton.style.cssText = `
+            width: 16px;
+            height: 16px;
+            line-height: 14px;
+            padding: 0;
+            font-size: 12px;
+            cursor: pointer;
+            background-color: #f44336;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+        `;
+        deleteButton.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            const confirmDelete = confirm(`Удалить кнопку "${buttonConfig.name}"?`);
+            if (!confirmDelete) return;
+            await removeFieldButtonFromConfig(fieldId, buttonConfig);
+            wrapper.remove();
+        });
+
+        wrapper.appendChild(button);
+        wrapper.appendChild(deleteButton);
+        return wrapper;
+    }
+
+    function isMultilineElement(element) {
+        if (!element) return false;
+        if (element.tagName === 'TEXTAREA') return true;
+        if (element.isContentEditable) return true;
+        return false;
+    }
+
+    async function addFieldButtonToConfig(fieldId, newButton) {
+        const config = await loadLocalConfigForUpdate();
+        if (!config.fields) config.fields = {};
+        if (!Array.isArray(config.fields[fieldId])) {
+            config.fields[fieldId] = [];
+        }
+        config.fields[fieldId].push(newButton);
+        saveConfigText(JSON.stringify(config, null, 2));
+    }
+
+    async function removeFieldButtonFromConfig(fieldId, buttonConfig) {
+        const config = await loadLocalConfigForUpdate();
+        if (!config.fields || !Array.isArray(config.fields[fieldId])) return;
+        config.fields[fieldId] = config.fields[fieldId].filter(item => {
+            return !(item.name === buttonConfig.name && item.text === buttonConfig.text);
+        });
+        saveConfigText(JSON.stringify(config, null, 2));
     }
 
     // Удаление кнопок возле полей
@@ -557,6 +660,11 @@
         return JSON.parse(processedConfig);
     }
 
+    async function loadLocalConfigForUpdate() {
+        const configText = await loadConfigText();
+        return JSON.parse(configText);
+    }
+
     async function loadConfigText() {
         if (cachedConfigText) return cachedConfigText;
 
@@ -642,10 +750,10 @@
                 JSON.parse(textarea.value);
                 saveConfigText(textarea.value);
                 modal.remove();
-                if (CONFIG.autoButtonsMode) {
+                if (CONFIG.complexToolsMode) {
                     createButtonsFromExternalConfig();
-                    loadAndCreateFieldButtons();
                 }
+                refreshFieldButtons();
             } catch (e) {
                 alert('Некорректный JSON: ' + e.message);
             }
@@ -698,10 +806,10 @@
                     if (onLoaded) {
                         onLoaded(text);
                     }
-                    if (CONFIG.autoButtonsMode) {
+                    if (CONFIG.complexToolsMode) {
                         createButtonsFromExternalConfig();
-                        loadAndCreateFieldButtons();
                     }
+                    refreshFieldButtons();
                 } catch (e) {
                     alert('Не удалось загрузить бэкап: ' + e.message);
                 }
@@ -709,6 +817,58 @@
             reader.readAsText(file);
         });
         input.click();
+    }
+
+    function refreshFieldButtons() {
+        removeFieldButtons();
+        loadAndCreateFieldButtons();
+    }
+
+    function ensureRandomRefreshButton(win) {
+        try {
+            if (win.document.querySelector('.random-refresh-button')) return true;
+            const targetId = Object.keys(CONFIG.randomFields).find((fieldId) => {
+                return win.document.getElementById(fieldId);
+            });
+            if (targetId) {
+                const targetElement = win.document.getElementById(targetId);
+                if (!targetElement) return false;
+
+                const refreshButton = win.document.createElement('button');
+                refreshButton.className = 'random-refresh-button';
+                refreshButton.textContent = '🔄';
+                refreshButton.title = 'Обновить случайные поля';
+                refreshButton.style.cssText = `
+                    margin-left: 6px;
+                    padding: 3px 6px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    background-color: #2196F3;
+                    color: #fff;
+                    border: 1px solid #1e88e5;
+                    border-radius: 4px;
+                `;
+                refreshButton.addEventListener('click', () => {
+                    updateRandomFields();
+                });
+                targetElement.insertAdjacentElement('afterend', refreshButton);
+                return true;
+            }
+
+            if (win.frames && win.frames.length > 0) {
+                for (let i = 0; i < win.frames.length; i++) {
+                    try {
+                        const inserted = ensureRandomRefreshButton(win.frames[i]);
+                        if (inserted) return true;
+                    } catch (e) {
+                        console.log('Нет доступа к фрейму при добавлении кнопки обновления:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Ошибка при добавлении кнопки обновления случайных полей:', e);
+        }
+        return false;
     }
 
     // Обновление случайных полей
