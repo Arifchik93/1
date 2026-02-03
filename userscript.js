@@ -33,6 +33,7 @@
             'singleLineTextInput7': { type: 'range', min: 14, max: 18, step: 1 }
         },
         autoButtonsMode: localStorage.getItem('autoButtonsMode') === 'true' || false,
+        fieldButtonsEnabled: localStorage.getItem('fieldButtonsEnabled') !== 'false',
         // Целевые признаки для обнаружения правильной страницы
         targetSelectors: [
             '#gostValue11',
@@ -45,10 +46,15 @@
 
     const CONFIG_STORAGE_KEY = 'caopConfigText';
     let cachedConfigText = null;
+    const TARGET_FIELD_ID = 'gostValue11';
+    const TARGET_FIELD_VALUE = '2185694';
+    let targetWindow = null;
 
     // Главная функция инициализации
-    function init() {
+    async function init() {
         console.log('Скрипт инициализирован. Поиск целевой страницы...');
+
+        await waitForTargetWindow();
 
         // Проверяем наличие нужных элементов с задержкой
         setTimeout(() => {
@@ -58,7 +64,7 @@
                 updateRandomFields();
 
                 // Загружаем кнопки возле полей при инициализации
-                if (CONFIG.autoButtonsMode) {
+                if (CONFIG.autoButtonsMode && CONFIG.fieldButtonsEnabled) {
                     loadAndCreateFieldButtons();
                 }
             } else {
@@ -74,8 +80,70 @@
         }, 1000);
     }
 
+    function matchesTargetElement(element) {
+        if (!element) return false;
+        const value = element.value ?? element.textContent ?? '';
+        return value.trim() === TARGET_FIELD_VALUE;
+    }
+
+    function findTargetWindow() {
+        const mainElement = document.getElementById(TARGET_FIELD_ID);
+        if (matchesTargetElement(mainElement)) {
+            return window;
+        }
+
+        const frames = document.getElementsByTagName('iframe');
+        for (let i = 0; i < frames.length; i++) {
+            try {
+                const frameDoc = frames[i].contentDocument || frames[i].contentWindow.document;
+                const element = frameDoc.getElementById(TARGET_FIELD_ID);
+                if (matchesTargetElement(element)) {
+                    return frames[i].contentWindow;
+                }
+            } catch (e) {
+                console.log('Нет доступа к фрейму:', e);
+            }
+        }
+
+        return null;
+    }
+
+    function waitForTargetWindow(timeoutMs = 30000, intervalMs = 500) {
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            const check = () => {
+                if (targetWindow && !targetWindow.closed) {
+                    resolve(targetWindow);
+                    return true;
+                }
+
+                const found = findTargetWindow();
+                if (found) {
+                    targetWindow = found;
+                    resolve(found);
+                    return true;
+                }
+
+                if (Date.now() - startTime >= timeoutMs) {
+                    resolve(null);
+                    return true;
+                }
+                return false;
+            };
+
+            if (check()) return;
+
+            const interval = setInterval(() => {
+                if (check()) {
+                    clearInterval(interval);
+                }
+            }, intervalMs);
+        });
+    }
+
     // Улучшенная проверка целевой страницы
     function isTargetPage() {
+        if (targetWindow) return true;
         // Проверка 1: Наличие характерных полей
         const hasFormFields = checkForFormFields();
         if (hasFormFields) return true;
@@ -118,6 +186,7 @@
 
     // Проверка наличия полей формы
     function checkForFormFields() {
+        if (findTargetWindow()) return true;
         // Проверка в основном документе
         for (const selector of CONFIG.targetSelectors) {
             try {
@@ -192,18 +261,6 @@
         // Создаем кнопки по очереди для отладки
         const buttons = [
             {
-                text: '⚙️',
-                color: CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800',
-                title: CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ',
-                action: toggleAutoButtonsMode
-            },
-            {
-                text: '📝',
-                color: '#607D8B',
-                title: 'Редактировать CAOP-конфиг',
-                action: () => openConfigEditor()
-            },
-            {
                 text: '🧪',
                 color: '#9C27B0',
                 title: 'Направление на цитологическое исследование',
@@ -223,15 +280,6 @@
                 }
             },
             {
-                text: 'R',
-                color: '#9C27B0',
-                title: 'Реестр',
-                action: () => {
-                    console.log('Кнопка реестра нажата');
-                    displayDataFrame();
-                }
-            },
-            {
                 text: 'С',
                 color: '#9C27B0',
                 title: 'согласие',
@@ -239,6 +287,12 @@
                     console.log('Кнопка согласия нажата');
                     processAndPrintTemplate('coglasie');
                 }
+            },
+            {
+                text: '⚙️',
+                color: '#607D8B',
+                title: 'Настройки',
+                action: () => toggleSettingsMenu()
             }
         ];
 
@@ -289,7 +343,15 @@
             }, index * 100);
         });
 
+        const settingsMenu = createSettingsMenu();
+        container.appendChild(settingsMenu);
         document.body.appendChild(container);
+        document.addEventListener('click', (event) => {
+            const menu = document.getElementById('mainSettingsMenu');
+            if (!menu) return;
+            if (container.contains(event.target)) return;
+            menu.style.display = 'none';
+        });
         console.log('Кнопки созданы');
 
         if (CONFIG.autoButtonsMode) {
@@ -302,19 +364,41 @@
         CONFIG.autoButtonsMode = !CONFIG.autoButtonsMode;
         localStorage.setItem('autoButtonsMode', CONFIG.autoButtonsMode.toString());
 
-        const toggleBtn = document.querySelector('#mainTriggerButtonsContainer button:first-child');
-        if (toggleBtn) {
-            toggleBtn.style.backgroundColor = CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800';
-            toggleBtn.title = CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ';
-        }
+        updateSettingsMenuLabels();
 
         if (CONFIG.autoButtonsMode) {
             createButtonsFromExternalConfig();
-            loadAndCreateFieldButtons();
+            if (CONFIG.fieldButtonsEnabled) {
+                loadAndCreateFieldButtons();
+            }
         } else {
             const tools = document.querySelector('.global-tools-container');
             if (tools) tools.remove();
 
+            removeFieldButtons();
+        }
+    }
+
+    async function forceShowFieldButtons() {
+        await waitForTargetWindow();
+        if (!targetWindow) {
+            alert('Фрейм с нужной формой не найден.');
+            return;
+        }
+        CONFIG.fieldButtonsEnabled = true;
+        localStorage.setItem('fieldButtonsEnabled', 'true');
+        loadAndCreateFieldButtons();
+        updateSettingsMenuLabels();
+    }
+
+    function toggleFieldButtonsEnabled() {
+        CONFIG.fieldButtonsEnabled = !CONFIG.fieldButtonsEnabled;
+        localStorage.setItem('fieldButtonsEnabled', CONFIG.fieldButtonsEnabled.toString());
+        updateSettingsMenuLabels();
+
+        if (CONFIG.fieldButtonsEnabled) {
+            loadAndCreateFieldButtons();
+        } else {
             removeFieldButtons();
         }
     }
@@ -324,7 +408,9 @@
         try {
             const config = await loadLocalConfig();
 
-            processFieldsForButtons(window, config);
+            await waitForTargetWindow();
+            const activeWindow = targetWindow || window;
+            processFieldsForButtons(activeWindow, config);
 
         } catch (e) {
             console.error('Ошибка при загрузке конфигурации для кнопок полей:', e);
@@ -400,15 +486,13 @@
         const mainButtons = document.querySelectorAll('.field-buttons');
         mainButtons.forEach(btn => btn.remove());
 
-        // Удаляем из фреймов
-        const frames = document.getElementsByTagName('iframe');
-        for (let frame of frames) {
+        // Удаляем из целевого фрейма
+        if (targetWindow) {
             try {
-                const frameDoc = frame.contentDocument || frame.contentWindow.document;
-                const frameButtons = frameDoc.querySelectorAll('.field-buttons');
+                const frameButtons = targetWindow.document.querySelectorAll('.field-buttons');
                 frameButtons.forEach(btn => btn.remove());
             } catch (e) {
-                console.log('Нет доступа к фрейму для удаления кнопок:', e);
+                console.log('Нет доступа к целевому фрейму для удаления кнопок:', e);
             }
         }
     }
@@ -724,6 +808,15 @@
 
     // Получение элемента по ID рекурсивно
     function getElementByIdRecursive(id) {
+        if (targetWindow) {
+            try {
+                const element = targetWindow.document.getElementById(id);
+                if (element) return element;
+            } catch (e) {
+                console.log('Нет доступа к целевому фрейму при поиске элемента', id, ':', e);
+            }
+        }
+
         // Сначала ищем в основном документе
         let element = document.getElementById(id);
         if (element) return element;
@@ -1086,6 +1179,104 @@
     }
 
     // Запуск скрипта с улучшенной инициализацией
+    function createSettingsMenu() {
+        const settingsMenu = document.createElement('div');
+        settingsMenu.id = 'mainSettingsMenu';
+        settingsMenu.style.cssText = `
+            position: absolute;
+            bottom: 50px;
+            right: 0;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px;
+            display: none;
+            min-width: 220px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 10001;
+        `;
+
+        const menuTitle = document.createElement('div');
+        menuTitle.textContent = 'Настройки';
+        menuTitle.style.cssText = 'font-weight: bold; margin-bottom: 6px; text-align: center;';
+        settingsMenu.appendChild(menuTitle);
+
+        const menuItems = [
+            {
+                id: 'settings-auto-buttons',
+                text: 'Авто-кнопки',
+                action: toggleAutoButtonsMode
+            },
+            {
+                id: 'settings-field-buttons',
+                text: 'Кнопки полей',
+                action: toggleFieldButtonsEnabled
+            },
+            {
+                id: 'settings-force-field-buttons',
+                text: 'Показать кнопки полей',
+                action: forceShowFieldButtons
+            },
+            {
+                id: 'settings-config-editor',
+                text: 'Редактировать CAOP-конфиг',
+                action: () => openConfigEditor()
+            },
+            {
+                id: 'settings-registry',
+                text: 'Реестр',
+                action: () => displayDataFrame()
+            }
+        ];
+
+        menuItems.forEach(item => {
+            const button = document.createElement('button');
+            button.id = item.id;
+            button.textContent = item.text;
+            button.style.cssText = `
+                display: block;
+                width: 100%;
+                margin: 4px 0;
+                padding: 6px 8px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background: #f5f5f5;
+                cursor: pointer;
+                text-align: left;
+            `;
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                item.action();
+            });
+            settingsMenu.appendChild(button);
+        });
+
+        updateSettingsMenuLabels(settingsMenu);
+        return settingsMenu;
+    }
+
+    function toggleSettingsMenu() {
+        const menu = document.getElementById('mainSettingsMenu');
+        if (!menu) return;
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        updateSettingsMenuLabels(menu);
+    }
+
+    function updateSettingsMenuLabels(menuElement) {
+        const menu = menuElement || document.getElementById('mainSettingsMenu');
+        if (!menu) return;
+
+        const autoButton = menu.querySelector('#settings-auto-buttons');
+        if (autoButton) {
+            autoButton.textContent = CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ';
+        }
+
+        const fieldButton = menu.querySelector('#settings-field-buttons');
+        if (fieldButton) {
+            fieldButton.textContent = CONFIG.fieldButtonsEnabled ? 'Кнопки полей: ВКЛ' : 'Кнопки полей: ВЫКЛ';
+        }
+    }
+
     console.log('Скрипт Create Main Trigger Button загружен');
 
     // Запускаем инициализацию
@@ -1096,8 +1287,11 @@
     }
 
     // Также запускаем инициализацию при динамических изменениях
-    const observer = new MutationObserver(function(mutations) {
+    const observer = new MutationObserver(function() {
         // Проверяем, не появились ли целевые элементы
+        if (!targetWindow) {
+            waitForTargetWindow();
+        }
         if (!document.getElementById('mainTriggerButtonsContainer') && isTargetPage()) {
             createMainTriggerButton();
         }
