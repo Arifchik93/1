@@ -32,7 +32,6 @@
             'singleLineTextInput10': { type: 'list', values: [70, 75, 80, 85] },
             'singleLineTextInput7': { type: 'range', min: 14, max: 18, step: 1 }
         },
-        autoButtonsMode: localStorage.getItem('autoButtonsMode') === 'true' || false,
         // Целевые признаки для обнаружения правильной страницы
         targetSelectors: [
             '#gostValue11',
@@ -44,112 +43,88 @@
     };
 
     const CONFIG_STORAGE_KEY = 'caopConfigText';
+    const SETTINGS_STORAGE_KEYS = {
+        toolsMenuEnabled: 'toolsMenuEnabled',
+        editButtonsMode: 'editButtonsMode'
+    };
     let cachedConfigText = null;
+    let targetContext = null;
+    const SETTINGS = {
+        toolsMenuEnabled: localStorage.getItem(SETTINGS_STORAGE_KEYS.toolsMenuEnabled) !== 'false',
+        editButtonsMode: localStorage.getItem(SETTINGS_STORAGE_KEYS.editButtonsMode) === 'true'
+    };
 
     // Главная функция инициализации
     function init() {
         console.log('Скрипт инициализирован. Поиск целевой страницы...');
-
-        // Проверяем наличие нужных элементов с задержкой
         setTimeout(() => {
-            if (isTargetPage()) {
-                console.log('Целевая страница обнаружена. Создание интерфейса...');
-                createMainTriggerButton();
-                updateRandomFields();
-
-                // Загружаем кнопки возле полей при инициализации
-                if (CONFIG.autoButtonsMode) {
-                    loadAndCreateFieldButtons();
-                }
-            } else {
-                console.log('Целевая страница не обнаружена. Повторная проверка через 2 секунды...');
-                // Повторная проверка через 2 секунды
-                setTimeout(() => {
-                    if (isTargetPage()) {
-                        createMainTriggerButton();
-                        updateRandomFields();
-                    }
-                }, 2000);
-            }
-        }, 1000);
+            startTargetMonitoring();
+        }, 500);
     }
 
-    // Улучшенная проверка целевой страницы
-    function isTargetPage() {
-        // Проверка 1: Наличие характерных полей
-        const hasFormFields = checkForFormFields();
-        if (hasFormFields) return true;
-
-        // Проверка 2: Наличие URL признаков
-        const currentUrl = window.location.href;
-        const urlPatterns = [
-            /prod\/.*/,
-            /\/form\//,
-            /\/document\//,
-            /\/create\//
-        ];
-
-        for (const pattern of urlPatterns) {
-            if (pattern.test(currentUrl)) {
-                console.log('Целевая страница обнаружена по URL:', currentUrl);
-                return true;
+    function startTargetMonitoring() {
+        const check = () => {
+            const context = locateTargetContext();
+            if (context && context.document !== targetContext?.document) {
+                targetContext = context;
+                console.log('Целевой фрейм обнаружен. Создание интерфейса...');
+                onTargetContextReady();
             }
-        }
+        };
 
-        // Проверка 3: Наличие медицинских терминов на странице
-        const medicalTerms = [
-            'пациент',
-            'диагноз',
-            'материал',
-            'исследование',
-            'медицинск'
-        ];
+        check();
+        setInterval(check, 1000);
 
-        const pageText = document.body.textContent.toLowerCase();
-        for (const term of medicalTerms) {
-            if (pageText.includes(term)) {
-                console.log('Целевая страница обнаружена по термину:', term);
-                return true;
-            }
-        }
-
-        return false;
+        const observer = new MutationObserver(check);
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.addEventListener('load', check);
     }
 
-    // Проверка наличия полей формы
-    function checkForFormFields() {
-        // Проверка в основном документе
-        for (const selector of CONFIG.targetSelectors) {
-            try {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    console.log(`Найдены элементы: ${selector} (${elements.length} шт.)`);
-                    return true;
-                }
-            } catch (e) {
-                console.log('Ошибка при поиске элементов:', e);
-            }
+    function onTargetContextReady() {
+        createMainTriggerButton();
+        updateRandomFields();
+        createRandomFieldsRefreshButton();
+        loadAndCreateFieldButtons({ force: true });
+
+        if (SETTINGS.toolsMenuEnabled) {
+            createButtonsFromExternalConfig();
+        }
+    }
+
+    function locateTargetContext() {
+        const targetValue = '2185694';
+
+        const mainDoc = document;
+        if (isTargetDocument(mainDoc, targetValue)) {
+            return { window, document: mainDoc, frameElement: null };
         }
 
-        // Проверка во фреймах
         const frames = document.getElementsByTagName('iframe');
         for (let i = 0; i < frames.length; i++) {
             try {
-                const frameDoc = frames[i].contentDocument || frames[i].contentWindow.document;
-                for (const selector of CONFIG.targetSelectors) {
-                    const elements = frameDoc.querySelectorAll(selector);
-                    if (elements.length > 0) {
-                        console.log(`Найдены элементы во фрейме: ${selector}`);
-                        return true;
-                    }
+                const frame = frames[i];
+                const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                if (isTargetDocument(frameDoc, targetValue)) {
+                    return { window: frame.contentWindow, document: frameDoc, frameElement: frame };
                 }
             } catch (e) {
-                // Игнорируем ошибки доступа к фреймам
                 console.log('Нет доступа к фрейму:', e);
             }
         }
 
-        return false;
+        return null;
+    }
+
+    function isTargetDocument(doc, targetValue) {
+        if (!doc) return false;
+        const element = doc.getElementById('gostValue11');
+        if (!element) return false;
+        const value = (element.value || element.textContent || '').trim();
+        return value === targetValue;
+    }
+
+    function getTargetDocument() {
+        return targetContext?.document || document;
     }
 
     // Создание главной кнопки триггера (упрощенная версия для начала)
@@ -192,18 +167,6 @@
         // Создаем кнопки по очереди для отладки
         const buttons = [
             {
-                text: '⚙️',
-                color: CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800',
-                title: CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ',
-                action: toggleAutoButtonsMode
-            },
-            {
-                text: '📝',
-                color: '#607D8B',
-                title: 'Редактировать CAOP-конфиг',
-                action: () => openConfigEditor()
-            },
-            {
                 text: '🧪',
                 color: '#9C27B0',
                 title: 'Направление на цитологическое исследование',
@@ -223,22 +186,19 @@
                 }
             },
             {
-                text: 'R',
-                color: '#9C27B0',
-                title: 'Реестр',
-                action: () => {
-                    console.log('Кнопка реестра нажата');
-                    displayDataFrame();
-                }
-            },
-            {
                 text: 'С',
                 color: '#9C27B0',
-                title: 'согласие',
+                title: 'Согласие',
                 action: () => {
                     console.log('Кнопка согласия нажата');
                     processAndPrintTemplate('coglasie');
                 }
+            },
+            {
+                text: '⚙️',
+                color: '#607D8B',
+                title: 'Настройки',
+                action: toggleSettingsMenu
             }
         ];
 
@@ -292,69 +252,129 @@
         document.body.appendChild(container);
         console.log('Кнопки созданы');
 
-        if (CONFIG.autoButtonsMode) {
-            createButtonsFromExternalConfig();
-        }
     }
 
-    // Переключение режима авто-кнопок
-    function toggleAutoButtonsMode() {
-        CONFIG.autoButtonsMode = !CONFIG.autoButtonsMode;
-        localStorage.setItem('autoButtonsMode', CONFIG.autoButtonsMode.toString());
-
-        const toggleBtn = document.querySelector('#mainTriggerButtonsContainer button:first-child');
-        if (toggleBtn) {
-            toggleBtn.style.backgroundColor = CONFIG.autoButtonsMode ? '#4CAF50' : '#FF9800';
-            toggleBtn.title = CONFIG.autoButtonsMode ? 'Авто-кнопки: ВКЛ' : 'Авто-кнопки: ВЫКЛ';
+    function toggleSettingsMenu() {
+        const existing = document.getElementById('settingsMenuContainer');
+        if (existing) {
+            existing.remove();
+            return;
         }
 
-        if (CONFIG.autoButtonsMode) {
-            createButtonsFromExternalConfig();
-            loadAndCreateFieldButtons();
-        } else {
-            const tools = document.querySelector('.global-tools-container');
-            if (tools) tools.remove();
+        const menu = document.createElement('div');
+        menu.id = 'settingsMenuContainer';
+        menu.style.cssText = `
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            z-index: 10001;
+            background: rgba(240, 240, 240, 0.95);
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 220px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
 
-            removeFieldButtons();
-        }
+        const createMenuButton = (label, onClick) => {
+            const button = document.createElement('button');
+            button.textContent = label;
+            button.style.cssText = `
+                padding: 6px 10px;
+                font-size: 12px;
+                cursor: pointer;
+                background: #ffffff;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                text-align: left;
+            `;
+            button.addEventListener('click', onClick);
+            return button;
+        };
+
+        const toolsButton = createMenuButton(
+            SETTINGS.toolsMenuEnabled ? 'Комплексное меню: ВКЛ' : 'Комплексное меню: ВЫКЛ',
+            () => {
+                SETTINGS.toolsMenuEnabled = !SETTINGS.toolsMenuEnabled;
+                localStorage.setItem(SETTINGS_STORAGE_KEYS.toolsMenuEnabled, SETTINGS.toolsMenuEnabled.toString());
+                if (SETTINGS.toolsMenuEnabled) {
+                    createButtonsFromExternalConfig();
+                } else {
+                    const tools = document.querySelector('.global-tools-container');
+                    if (tools) tools.remove();
+                }
+                menu.remove();
+            }
+        );
+
+        const editButtonsButton = createMenuButton(
+            SETTINGS.editButtonsMode ? 'Редактирование кнопок: ВКЛ' : 'Редактирование кнопок: ВЫКЛ',
+            () => {
+                SETTINGS.editButtonsMode = !SETTINGS.editButtonsMode;
+                localStorage.setItem(SETTINGS_STORAGE_KEYS.editButtonsMode, SETTINGS.editButtonsMode.toString());
+                loadAndCreateFieldButtons({ force: true });
+                menu.remove();
+            }
+        );
+
+        const forceFieldButtons = createMenuButton(
+            'Показать кнопки под полями',
+            () => {
+                loadAndCreateFieldButtons({ force: true });
+                menu.remove();
+            }
+        );
+
+        const configEditorButton = createMenuButton('Редактировать CAOP-конфиг', () => {
+            openConfigEditor();
+            menu.remove();
+        });
+
+        const registryButton = createMenuButton('Реестр', () => {
+            displayDataFrame();
+            menu.remove();
+        });
+
+        menu.appendChild(toolsButton);
+        menu.appendChild(editButtonsButton);
+        menu.appendChild(forceFieldButtons);
+        menu.appendChild(configEditorButton);
+        menu.appendChild(registryButton);
+
+        document.body.appendChild(menu);
     }
 
     // Загрузка и создание кнопок возле полей
-    async function loadAndCreateFieldButtons() {
+    async function loadAndCreateFieldButtons({ force = false } = {}) {
         try {
+            if (!targetContext) return;
             const config = await loadLocalConfig();
-
-            processFieldsForButtons(window, config);
-
+            const targetDoc = getTargetDocument();
+            if (force) {
+                removeFieldButtons(targetDoc);
+            }
+            processFieldsForButtons(targetDoc, config);
         } catch (e) {
             console.error('Ошибка при загрузке конфигурации для кнопок полей:', e);
         }
     }
 
     // Обработка фреймов для создания кнопок возле полей
-    function processFieldsForButtons(win, config) {
+    function processFieldsForButtons(doc, config) {
         try {
-            // Сначала обрабатываем основной документ
             for (const fieldId in config.fields) {
                 if (fieldId === 'multiple') continue;
 
-                const element = win.document.getElementById(fieldId);
+                const element = doc.getElementById(fieldId);
                 if (element && !element.nextElementSibling?.classList?.contains('field-buttons')) {
-                    createFieldButtonsForElement(element, config.fields[fieldId]);
+                    createFieldButtonsForElement(element, config.fields[fieldId], fieldId);
                 }
             }
 
-            // Затем рекурсивно обрабатываем фреймы
-            if (win.frames && win.frames.length > 0) {
-                for (let i = 0; i < win.frames.length; i++) {
-                    try {
-                        // Используем try-catch для каждого фрейма отдельно
-                        processFieldsForButtons(win.frames[i], config);
-                    } catch (e) {
-                        console.log('Нет доступа к фрейму #' + i + ':', e);
-                        continue;
-                    }
-                }
+            if (SETTINGS.editButtonsMode) {
+                addEditControlsForMultilineFields(doc, config);
             }
         } catch (e) {
             console.error('Ошибка при обработке фрейма:', e);
@@ -362,17 +382,20 @@
     }
 
     // Создание кнопок для конкретного элемента
-    function createFieldButtonsForElement(element, buttonConfigs) {
-        const buttonContainer = document.createElement('div');
+    function createFieldButtonsForElement(element, buttonConfigs, fieldId) {
+        const ownerDoc = element.ownerDocument || document;
+        const buttonContainer = ownerDoc.createElement('div');
         buttonContainer.className = 'field-buttons';
         buttonContainer.style.cssText = `
             display: inline-block;
             margin-left: 10px;
             vertical-align: middle;
+            flex-wrap: wrap;
+            max-width: 100%;
         `;
 
-        buttonConfigs.forEach(buttonConfig => {
-            const button = document.createElement('button');
+        buttonConfigs.forEach((buttonConfig, index) => {
+            const button = ownerDoc.createElement('button');
             button.textContent = buttonConfig.name;
             button.style.cssText = `
                 margin: 2px;
@@ -389,28 +412,95 @@
             });
 
             buttonContainer.appendChild(button);
+
+            if (SETTINGS.editButtonsMode && isMultilineField(element)) {
+                const deleteButton = ownerDoc.createElement('button');
+                deleteButton.textContent = '×';
+                deleteButton.title = 'Удалить кнопку';
+                deleteButton.style.cssText = `
+                    margin: 2px;
+                    padding: 0 4px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    background-color: #f44336;
+                    color: white;
+                    border: none;
+                    border-radius: 3px;
+                `;
+                deleteButton.addEventListener('click', () => {
+                    deleteFieldButton(fieldId, index);
+                });
+                buttonContainer.appendChild(deleteButton);
+            }
         });
+
+        if (SETTINGS.editButtonsMode && isMultilineField(element)) {
+            const addButton = ownerDoc.createElement('button');
+            addButton.textContent = 'Добавить';
+            addButton.style.cssText = `
+                margin: 2px;
+                padding: 3px 6px;
+                font-size: 11px;
+                cursor: pointer;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            `;
+            addButton.addEventListener('click', () => {
+                addFieldButton(fieldId);
+            });
+            buttonContainer.appendChild(addButton);
+        }
 
         element.insertAdjacentElement('afterend', buttonContainer);
     }
 
-    // Удаление кнопок возле полей
-    function removeFieldButtons() {
-        // Удаляем из основного документа
-        const mainButtons = document.querySelectorAll('.field-buttons');
-        mainButtons.forEach(btn => btn.remove());
-
-        // Удаляем из фреймов
-        const frames = document.getElementsByTagName('iframe');
-        for (let frame of frames) {
-            try {
-                const frameDoc = frame.contentDocument || frame.contentWindow.document;
-                const frameButtons = frameDoc.querySelectorAll('.field-buttons');
-                frameButtons.forEach(btn => btn.remove());
-            } catch (e) {
-                console.log('Нет доступа к фрейму для удаления кнопок:', e);
+    function addEditControlsForMultilineFields(doc, config) {
+        const multilineElements = Array.from(doc.querySelectorAll('textarea, div[contenteditable="true"], [id^="multiLineTextDiv"]'));
+        multilineElements.forEach(element => {
+            if (!element.id) return;
+            if (!element.nextElementSibling?.classList?.contains('field-buttons')) {
+                const buttonConfigs = config.fields[element.id] || [];
+                createFieldButtonsForElement(element, buttonConfigs, element.id);
             }
+        });
+    }
+
+    function isMultilineField(element) {
+        if (!element) return false;
+        return element.tagName === 'TEXTAREA' || element.isContentEditable || element.id?.startsWith('multiLineTextDiv');
+    }
+
+    async function addFieldButton(fieldId) {
+        const name = prompt('Короткое название кнопки:');
+        if (!name) return;
+        const text = prompt('Текст для вставки:');
+        if (text === null) return;
+
+        const config = await loadLocalConfig();
+        if (!Array.isArray(config.fields[fieldId])) {
+            config.fields[fieldId] = [];
         }
+        config.fields[fieldId].push({ name, text });
+        saveConfigText(JSON.stringify(config, null, 2));
+        loadAndCreateFieldButtons({ force: true });
+    }
+
+    async function deleteFieldButton(fieldId, index) {
+        if (!confirm('Удалить эту кнопку навсегда?')) return;
+        const config = await loadLocalConfig();
+        if (!Array.isArray(config.fields[fieldId])) return;
+        config.fields[fieldId].splice(index, 1);
+        saveConfigText(JSON.stringify(config, null, 2));
+        loadAndCreateFieldButtons({ force: true });
+    }
+
+    // Удаление кнопок возле полей
+    function removeFieldButtons(doc) {
+        if (!doc) return;
+        const buttons = doc.querySelectorAll('.field-buttons');
+        buttons.forEach(btn => btn.remove());
     }
 
     // Создание кнопок из внешней конфигурации (панель инструментов)
@@ -642,10 +732,10 @@
                 JSON.parse(textarea.value);
                 saveConfigText(textarea.value);
                 modal.remove();
-                if (CONFIG.autoButtonsMode) {
+                if (SETTINGS.toolsMenuEnabled) {
                     createButtonsFromExternalConfig();
-                    loadAndCreateFieldButtons();
                 }
+                loadAndCreateFieldButtons({ force: true });
             } catch (e) {
                 alert('Некорректный JSON: ' + e.message);
             }
@@ -698,10 +788,10 @@
                     if (onLoaded) {
                         onLoaded(text);
                     }
-                    if (CONFIG.autoButtonsMode) {
+                    if (SETTINGS.toolsMenuEnabled) {
                         createButtonsFromExternalConfig();
-                        loadAndCreateFieldButtons();
                     }
+                    loadAndCreateFieldButtons({ force: true });
                 } catch (e) {
                     alert('Не удалось загрузить бэкап: ' + e.message);
                 }
@@ -724,23 +814,44 @@
 
     // Получение элемента по ID рекурсивно
     function getElementByIdRecursive(id) {
-        // Сначала ищем в основном документе
-        let element = document.getElementById(id);
-        if (element) return element;
+        const doc = getTargetDocument();
+        return doc.getElementById(id);
+    }
 
-        // Затем ищем во фреймах
-        const frames = document.getElementsByTagName('iframe');
-        for (let frame of frames) {
-            try {
-                const frameDoc = frame.contentDocument || frame.contentWindow.document;
-                element = frameDoc.getElementById(id);
-                if (element) return element;
-            } catch (e) {
-                console.log('Нет доступа к фрейму при поиске элемента', id, ':', e);
+    function createRandomFieldsRefreshButton() {
+        const doc = getTargetDocument();
+        if (doc.querySelector('.random-refresh-button')) return;
+
+        const randomFieldIds = Object.keys(CONFIG.randomFields);
+        let anchor = null;
+        for (const fieldId of randomFieldIds) {
+            const element = doc.getElementById(fieldId);
+            if (element) {
+                anchor = element;
+                break;
             }
         }
+        if (!anchor) return;
 
-        return null;
+        const button = doc.createElement('button');
+        button.className = 'random-refresh-button';
+        button.textContent = '🔄';
+        button.title = 'Обновить случайные значения';
+        button.style.cssText = `
+            margin-left: 8px;
+            padding: 2px 6px;
+            font-size: 12px;
+            cursor: pointer;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 3px;
+        `;
+        button.addEventListener('click', () => {
+            updateRandomFields();
+        });
+
+        anchor.insertAdjacentElement('afterend', button);
     }
 
     // Генерация случайных значений
@@ -1094,15 +1205,5 @@
     } else {
         init();
     }
-
-    // Также запускаем инициализацию при динамических изменениях
-    const observer = new MutationObserver(function(mutations) {
-        // Проверяем, не появились ли целевые элементы
-        if (!document.getElementById('mainTriggerButtonsContainer') && isTargetPage()) {
-            createMainTriggerButton();
-        }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
 
 })();
