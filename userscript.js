@@ -39,6 +39,7 @@
             }
             return localStorage.getItem('autoButtonsMode') === 'true';
         })(),
+        editControlsEnabled: localStorage.getItem('editControlsEnabled') !== 'false',
         // Целевые признаки для обнаружения правильной страницы
         targetSelectors: [
             '#gostValue11',
@@ -63,6 +64,7 @@
                 createMainTriggerButton();
                 updateRandomFields();
                 loadAndCreateFieldButtons();
+                registerFrameListeners();
             } else {
                 console.log('Целевая страница не обнаружена. Повторная проверка через 2 секунды...');
                 // Повторная проверка через 2 секунды
@@ -71,6 +73,7 @@
                         createMainTriggerButton();
                         updateRandomFields();
                         loadAndCreateFieldButtons();
+                        registerFrameListeners();
                     }
                 }, 2000);
             }
@@ -198,13 +201,29 @@
                 text: '⚙️',
                 color: CONFIG.complexToolsMode ? '#4CAF50' : '#FF9800',
                 title: CONFIG.complexToolsMode ? 'Комплексное меню: ВКЛ' : 'Комплексное меню: ВЫКЛ',
-                action: toggleComplexToolsMode
+                action: toggleComplexToolsMode,
+                role: 'complex-toggle'
             },
             {
                 text: '📝',
                 color: '#607D8B',
                 title: 'Редактировать CAOP-конфиг',
-                action: () => openConfigEditor()
+                action: () => openConfigEditor(),
+                role: 'config-editor'
+            },
+            {
+                text: '📌',
+                color: '#03A9F4',
+                title: 'Показать кнопки у полей',
+                action: () => refreshFieldButtons(),
+                role: 'force-field-buttons'
+            },
+            {
+                text: '✏️',
+                color: CONFIG.editControlsEnabled ? '#4CAF50' : '#9E9E9E',
+                title: CONFIG.editControlsEnabled ? 'Редактирование кнопок: ВКЛ' : 'Редактирование кнопок: ВЫКЛ',
+                action: toggleEditControls,
+                role: 'edit-controls-toggle'
             },
             {
                 text: '🧪',
@@ -250,6 +269,9 @@
                 const button = document.createElement('button');
                 button.innerHTML = btn.text;
                 button.title = btn.title;
+                if (btn.role) {
+                    button.dataset.role = btn.role;
+                }
                 button.style.cssText = `
                     width: 40px;
                     height: 40px;
@@ -305,7 +327,7 @@
         CONFIG.complexToolsMode = !CONFIG.complexToolsMode;
         localStorage.setItem('complexToolsMode', CONFIG.complexToolsMode.toString());
 
-        const toggleBtn = document.querySelector('#mainTriggerButtonsContainer button:first-child');
+        const toggleBtn = document.querySelector('#mainTriggerButtonsContainer button[data-role="complex-toggle"]');
         if (toggleBtn) {
             toggleBtn.style.backgroundColor = CONFIG.complexToolsMode ? '#4CAF50' : '#FF9800';
             toggleBtn.title = CONFIG.complexToolsMode ? 'Комплексное меню: ВКЛ' : 'Комплексное меню: ВЫКЛ';
@@ -319,6 +341,19 @@
         }
     }
 
+    function toggleEditControls() {
+        CONFIG.editControlsEnabled = !CONFIG.editControlsEnabled;
+        localStorage.setItem('editControlsEnabled', CONFIG.editControlsEnabled.toString());
+
+        const editToggleBtn = document.querySelector('#mainTriggerButtonsContainer button[data-role="edit-controls-toggle"]');
+        if (editToggleBtn) {
+            editToggleBtn.style.backgroundColor = CONFIG.editControlsEnabled ? '#4CAF50' : '#9E9E9E';
+            editToggleBtn.title = CONFIG.editControlsEnabled ? 'Редактирование кнопок: ВКЛ' : 'Редактирование кнопок: ВЫКЛ';
+        }
+
+        updateEditControlsVisibility();
+    }
+
     // Загрузка и создание кнопок возле полей
     async function loadAndCreateFieldButtons() {
         try {
@@ -326,6 +361,7 @@
 
             processFieldsForButtons(window, config);
             ensureRandomRefreshButton(window);
+            updateEditControlsVisibility();
 
         } catch (e) {
             console.error('Ошибка при загрузке конфигурации для кнопок полей:', e);
@@ -344,6 +380,8 @@
                     createFieldButtonsForElement(element, fieldId, config.fields[fieldId]);
                 }
             }
+
+            ensureRandomRefreshButton(win);
 
             // Затем рекурсивно обрабатываем фреймы
             if (win.frames && win.frames.length > 0) {
@@ -387,6 +425,7 @@
         if (isMultilineElement(element)) {
             const addButton = document.createElement('button');
             addButton.textContent = 'добавить';
+            addButton.className = 'field-button-control';
             addButton.style.cssText = `
                 margin: 2px;
                 padding: 3px 6px;
@@ -446,6 +485,7 @@
         const deleteButton = document.createElement('button');
         deleteButton.textContent = '×';
         deleteButton.title = 'Удалить кнопку';
+        deleteButton.className = 'field-button-control';
         deleteButton.style.cssText = `
             width: 16px;
             height: 16px;
@@ -604,47 +644,6 @@
                     container.appendChild(button);
                 });
 
-                // Добавляем кнопку очистки полей
-                const clearButton = document.createElement('button');
-                clearButton.textContent = 'Очистить все поля';
-                clearButton.style.cssText = `
-                    display: block;
-                    margin: 8px 0;
-                    padding: 8px 12px;
-                    cursor: pointer;
-                    width: 100%;
-                    background: rgba(244, 67, 54, 0.9);
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    margin-top: 15px;
-                `;
-
-                clearButton.addEventListener('click', () => {
-                    const fieldsToClear = [
-                        "multiLineTextDiv6",
-                        "multiLineTextDiv1",
-                        "multiLineTextDiv2",
-                        "singleLineTextInput4",
-                        "singleLineTextInput5",
-                        "singleLineTextInput10",
-                        "singleLineTextInput7",
-                        "singleLineTextInput8",
-                        "multiLineTextDiv3",
-                        "multiLineTextDiv5",
-                        "multiLineTextDiv4"
-                    ];
-
-                    fieldsToClear.forEach(fieldId => {
-                        const element = getElementByIdRecursive(fieldId);
-                        if (element) {
-                            insertText(element, '', true);
-                        }
-                    });
-                });
-
-                container.appendChild(clearButton);
             }
 
             document.body.appendChild(container);
@@ -822,6 +821,41 @@
     function refreshFieldButtons() {
         removeFieldButtons();
         loadAndCreateFieldButtons();
+    }
+
+    function updateEditControlsVisibility() {
+        const toggleVisibility = (doc) => {
+            const controls = doc.querySelectorAll('.field-button-control');
+            controls.forEach(control => {
+                control.style.display = CONFIG.editControlsEnabled ? '' : 'none';
+            });
+        };
+
+        toggleVisibility(document);
+
+        const frames = document.getElementsByTagName('iframe');
+        for (let frame of frames) {
+            try {
+                const frameDoc = frame.contentDocument || frame.contentWindow.document;
+                if (frameDoc) {
+                    toggleVisibility(frameDoc);
+                }
+            } catch (e) {
+                console.log('Нет доступа к фрейму для обновления видимости кнопок:', e);
+            }
+        }
+    }
+
+    function registerFrameListeners() {
+        const frames = document.getElementsByTagName('iframe');
+        for (let frame of frames) {
+            if (frame.dataset?.fieldButtonsListenerAttached) continue;
+            frame.dataset.fieldButtonsListenerAttached = 'true';
+            frame.addEventListener('load', () => {
+                refreshFieldButtons();
+                registerFrameListeners();
+            });
+        }
     }
 
     function ensureRandomRefreshButton(win) {
@@ -1261,6 +1295,7 @@
         if (!document.getElementById('mainTriggerButtonsContainer') && isTargetPage()) {
             createMainTriggerButton();
         }
+        registerFrameListeners();
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
