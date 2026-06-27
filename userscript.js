@@ -52,6 +52,15 @@
         toolsMenuEnabled: 'toolsMenuEnabled',
         editButtonsMode: 'editButtonsMode'
     };
+    const FIELD_LABELS = {
+        multiLineTextDiv6: 'Жалобы',
+        multiLineTextDiv1: 'Анамнез',
+        multiLineTextDiv2: 'Аллергии / наследственность',
+        singleLineTextInput8: 'Кожа',
+        multiLineTextDiv3: 'Осмотр / локальный статус',
+        multiLineTextDiv5: 'Диагноз / проведено',
+        multiLineTextDiv4: 'Рекомендации'
+    };
     let cachedConfigText = null;
     let targetContext = null;
     const SETTINGS = {
@@ -478,18 +487,118 @@
     }
 
     async function addFieldButton(fieldId) {
-        const name = prompt('Короткое название кнопки:');
-        if (!name) return;
-        const text = prompt('Текст для вставки:');
-        if (text === null) return;
+        openButtonEditorDialog({
+            fieldId,
+            title: `Новая кнопка: ${getFieldLabel(fieldId)}`,
+            onSave: async ({ name, text }) => {
+                const config = await loadLocalConfig();
+                if (!Array.isArray(config.fields[fieldId])) {
+                    config.fields[fieldId] = [];
+                }
+                config.fields[fieldId].push({ name, text });
+                saveConfigText(JSON.stringify(config, null, 2));
+                loadAndCreateFieldButtons({ force: true });
+            }
+        });
+    }
 
-        const config = await loadLocalConfig();
-        if (!Array.isArray(config.fields[fieldId])) {
-            config.fields[fieldId] = [];
-        }
-        config.fields[fieldId].push({ name, text });
-        saveConfigText(JSON.stringify(config, null, 2));
-        loadAndCreateFieldButtons({ force: true });
+    function getFieldLabel(fieldId) {
+        return FIELD_LABELS[fieldId] || fieldId;
+    }
+
+    function openButtonEditorDialog({ fieldId, title, initialName = '', initialText = '', onSave }) {
+        const oldDialog = document.getElementById('caopButtonEditorDialog');
+        if (oldDialog) oldDialog.remove();
+
+        const dialog = document.createElement('div');
+        dialog.id = 'caopButtonEditorDialog';
+        dialog.style.cssText = `
+            position: fixed;
+            top: 88px;
+            right: 88px;
+            z-index: 10002;
+            width: min(560px, calc(100vw - 120px));
+            background: #ffffff;
+            color: #1f2937;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        `;
+
+        dialog.innerHTML = `
+            <div class="caop-dialog-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#eef2ff;border-bottom:1px solid #c7d2fe;cursor:move;">
+                <div>
+                    <div style="font-weight:700;font-size:14px;">${escapeHtml(title)}</div>
+                    <div style="font-size:12px;color:#475569;">Окно не блокирует страницу: можно копировать текст из формы и продолжать работу.</div>
+                </div>
+                <button type="button" data-close style="border:none;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:#64748b;">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:12px;padding:14px;">
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;">
+                    Название
+                    <input data-name type="text" value="${escapeAttribute(initialName)}" placeholder="Напр.: СКТ" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;">
+                    Текст
+                    <textarea data-text placeholder="Введите текст, который будет вставляться в поле" style="min-height:118px;resize:vertical;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(initialText)}</textarea>
+                </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <span style="font-size:12px;color:#64748b;">Поле: ${escapeHtml(getFieldLabel(fieldId))}</span>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" data-close style="padding:8px 12px;border:1px solid #cbd5e1;background:white;border-radius:8px;cursor:pointer;">Отмена</button>
+                    <button type="button" data-save style="padding:8px 14px;border:none;background:#16a34a;color:white;border-radius:8px;cursor:pointer;font-weight:700;">Сохранить кнопку</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        const nameInput = dialog.querySelector('[data-name]');
+        const textInput = dialog.querySelector('[data-text]');
+        nameInput.focus();
+        dialog.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => dialog.remove()));
+        dialog.querySelector('[data-save]').addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            const text = textInput.value;
+            if (!name) {
+                nameInput.focus();
+                nameInput.style.borderColor = '#ef4444';
+                return;
+            }
+            await onSave({ name, text });
+            dialog.remove();
+        });
+        makeFloatingPanelDraggable(dialog, dialog.querySelector('.caop-dialog-header'));
+    }
+
+    function makeFloatingPanelDraggable(panel, handle) {
+        let startX = 0, startY = 0, startTop = 0, startLeft = 0, dragging = false;
+        handle.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return;
+            dragging = true;
+            const rect = panel.getBoundingClientRect();
+            startX = e.clientX; startY = e.clientY; startTop = rect.top; startLeft = rect.left;
+            panel.style.right = 'auto';
+            panel.style.left = `${startLeft}px`;
+            panel.style.top = `${startTop}px`;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            panel.style.left = `${Math.max(8, startLeft + e.clientX - startX)}px`;
+            panel.style.top = `${Math.max(8, startTop + e.clientY - startY)}px`;
+        });
+        document.addEventListener('mouseup', () => { dragging = false; });
+    }
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+    }
+
+    function escapeAttribute(value) {
+        return escapeHtml(value).replace(/'/g, '&#39;');
     }
 
     async function deleteFieldButton(fieldId, index) {
@@ -675,94 +784,284 @@
         const existing = document.getElementById('configEditorModal');
         if (existing) existing.remove();
 
+        let config;
+        try {
+            config = await loadLocalConfig();
+        } catch (e) {
+            config = JSON.parse(DEFAULT_CAOP_CONFIG_TEXT);
+        }
+        if (!config.fields) config.fields = {};
+        if (!Array.isArray(config.fields.multiple)) config.fields.multiple = [];
+
+        let selectedType = 'field';
+        let selectedKey = Object.keys(config.fields).find(key => key !== 'multiple') || 'multiLineTextDiv6';
+        let selectedMultipleIndex = 0;
+
         const modal = document.createElement('div');
         modal.id = 'configEditorModal';
         modal.style.cssText = `
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(1180px, calc(100vw - 36px));
+            height: min(760px, calc(100vh - 96px));
+            background: #ffffff;
             z-index: 10001;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        `;
-
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 900px;
-            max-height: 90%;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            overflow: hidden;
+            font-family: Arial, sans-serif;
         `;
 
-        const header = document.createElement('div');
-        header.textContent = 'Редактор CAOP-конфига';
-        header.style.cssText = 'font-weight: bold; font-size: 16px;';
+        modal.innerHTML = `
+            <div class="caop-editor-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:#eef2ff;border-bottom:1px solid #c7d2fe;cursor:move;">
+                <div style="font-weight:800;font-size:16px;color:#1e293b;">Редактор CAOP</div>
+                <button type="button" data-close style="border:none;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#64748b;">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:280px 1fr;min-height:0;flex:1;">
+                <div data-sidebar style="background:#f8fafc;border-right:1px solid #e2e8f0;padding:12px;overflow-y:auto;"></div>
+                <div style="display:flex;flex-direction:column;min-width:0;min-height:0;">
+                    <div data-editor-title style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:800;color:#1e293b;"></div>
+                    <div data-editor-body style="flex:1;min-height:0;overflow:auto;padding:14px;background:#ffffff;"></div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <div data-status style="font-size:12px;color:#64748b;"></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                    <button type="button" data-download style="padding:8px 12px;background:#3F51B5;color:white;border:none;border-radius:8px;cursor:pointer;">Скачать бэкап</button>
+                    <button type="button" data-upload style="padding:8px 12px;background:#3F51B5;color:white;border:none;border-radius:8px;cursor:pointer;">Загрузить бэкап</button>
+                    <button type="button" data-reset style="padding:8px 12px;border:1px solid #fecaca;background:#fff1f2;color:#be123c;border-radius:8px;cursor:pointer;">Сброс</button>
+                    <button type="button" data-close style="padding:8px 12px;background:#777;color:white;border:none;border-radius:8px;cursor:pointer;">Отмена</button>
+                    <button type="button" data-save style="padding:8px 14px;background:#4CAF50;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Сохранить</button>
+                </div>
+            </div>
+        `;
 
-        const textarea = document.createElement('textarea');
-        textarea.style.cssText = 'width: 100%; height: 60vh; font-family: monospace; font-size: 12px;';
-        textarea.value = await loadConfigText();
-
-        const buttonsRow = document.createElement('div');
-        buttonsRow.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
-
-        const downloadButton = document.createElement('button');
-        downloadButton.textContent = 'Скачать бэкап';
-        downloadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        downloadButton.addEventListener('click', () => downloadConfigBackup(textarea.value));
-
-        const uploadButton = document.createElement('button');
-        uploadButton.textContent = 'Загрузить бэкап';
-        uploadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        uploadButton.addEventListener('click', () => uploadConfigBackup((text) => {
-            textarea.value = text;
-        }));
-
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Сохранить';
-        saveButton.style.cssText = 'padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        saveButton.addEventListener('click', () => {
-            try {
-                JSON.parse(textarea.value);
-                saveConfigText(textarea.value);
-                modal.remove();
-                if (SETTINGS.toolsMenuEnabled) {
-                    createButtonsFromExternalConfig();
-                }
-                loadAndCreateFieldButtons({ force: true });
-            } catch (e) {
-                alert('Некорректный JSON: ' + e.message);
-            }
-        });
-
-        const cancelButton = document.createElement('button');
-        cancelButton.textContent = 'Отмена';
-        cancelButton.style.cssText = 'padding: 8px 16px; background: #777; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        cancelButton.addEventListener('click', () => modal.remove());
-
-        buttonsRow.appendChild(cancelButton);
-        buttonsRow.appendChild(downloadButton);
-        buttonsRow.appendChild(uploadButton);
-        buttonsRow.appendChild(saveButton);
-
-        content.appendChild(header);
-        content.appendChild(textarea);
-        content.appendChild(buttonsRow);
-        modal.appendChild(content);
         document.body.appendChild(modal);
 
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.remove();
+        const sidebar = modal.querySelector('[data-sidebar]');
+        const editorTitle = modal.querySelector('[data-editor-title]');
+        const editorBody = modal.querySelector('[data-editor-body]');
+        const status = modal.querySelector('[data-status]');
+
+        const persistStatus = () => {
+            const fieldsCount = Object.keys(config.fields).filter(key => key !== 'multiple').length;
+            status.textContent = `${fieldsCount} полей, ${config.fields.multiple.length} комплексных кнопок`;
+        };
+
+        const saveFromEditor = () => {
+            editorBody.querySelectorAll('[data-button-index]').forEach(row => {
+                const index = Number(row.dataset.buttonIndex);
+                const list = config.fields[selectedKey];
+                if (!Array.isArray(list) || !list[index]) return;
+                list[index].name = row.querySelector('[data-name]').value;
+                list[index].text = row.querySelector('[data-text]').value;
+            });
+
+            editorBody.querySelectorAll('[data-multiple-field]').forEach(field => {
+                const multiple = config.fields.multiple[selectedMultipleIndex];
+                if (!multiple) return;
+                if (!multiple.fields) multiple.fields = {};
+                multiple.fields[field.dataset.multipleField] = field.value;
+            });
+
+            const multipleName = editorBody.querySelector('[data-multiple-name]');
+            if (multipleName && config.fields.multiple[selectedMultipleIndex]) {
+                config.fields.multiple[selectedMultipleIndex].name = multipleName.value;
+            }
+        };
+
+        const selectItem = (type, keyOrIndex) => {
+            saveFromEditor();
+            selectedType = type;
+            if (type === 'field') selectedKey = keyOrIndex;
+            if (type === 'multiple') selectedMultipleIndex = keyOrIndex;
+            renderSidebar();
+            renderEditor();
+        };
+
+        const renderSidebar = () => {
+            const fieldKeys = Object.keys(config.fields).filter(key => key !== 'multiple');
+            const fieldButtons = fieldKeys.map(key => {
+                const count = Array.isArray(config.fields[key]) ? config.fields[key].length : 0;
+                const active = selectedType === 'field' && selectedKey === key;
+                return `<button type="button" data-select-field="${escapeAttribute(key)}" style="width:100%;text-align:left;margin-bottom:6px;padding:9px 10px;border:1px solid ${active ? '#4f46e5' : '#e2e8f0'};background:${active ? '#eef2ff' : '#ffffff'};border-radius:9px;cursor:pointer;color:#1e293b;"><b>${escapeHtml(getFieldLabel(key))}</b><br><span style="font-size:12px;color:#64748b;">${count} кнопок</span></button>`;
+            }).join('');
+
+            const multipleButtons = config.fields.multiple.map((item, index) => {
+                const active = selectedType === 'multiple' && selectedMultipleIndex === index;
+                return `<button type="button" data-select-multiple="${index}" style="width:100%;text-align:left;margin-bottom:6px;padding:9px 10px;border:1px solid ${active ? '#0284c7' : '#e2e8f0'};background:${active ? '#e0f2fe' : '#ffffff'};border-radius:9px;cursor:pointer;color:#1e293b;"><b>${escapeHtml(item.name || `Комплекс ${index + 1}`)}</b><br><span style="font-size:12px;color:#64748b;">комплексная кнопка</span></button>`;
+            }).join('');
+
+            sidebar.innerHTML = `
+                <div style="font-weight:800;margin-bottom:8px;color:#334155;">Быстрые поля</div>
+                ${fieldButtons || '<div style="font-size:12px;color:#64748b;margin-bottom:10px;">Нет полей</div>'}
+                <button type="button" data-add-field style="width:100%;margin:6px 0 14px;padding:8px 10px;border:none;background:#16a34a;color:white;border-radius:9px;cursor:pointer;">+ Поле</button>
+                <div style="font-weight:800;margin:12px 0 8px;color:#334155;">Комплексные кнопки</div>
+                ${multipleButtons || '<div style="font-size:12px;color:#64748b;margin-bottom:10px;">Нет комплексных кнопок</div>'}
+                <button type="button" data-add-multiple style="width:100%;margin-top:6px;padding:8px 10px;border:none;background:#0284c7;color:white;border-radius:9px;cursor:pointer;">+ Комплексная</button>
+            `;
+
+            sidebar.querySelectorAll('[data-select-field]').forEach(btn => {
+                btn.addEventListener('click', () => selectItem('field', btn.dataset.selectField));
+            });
+            sidebar.querySelectorAll('[data-select-multiple]').forEach(btn => {
+                btn.addEventListener('click', () => selectItem('multiple', Number(btn.dataset.selectMultiple)));
+            });
+            sidebar.querySelector('[data-add-field]').addEventListener('click', () => {
+                saveFromEditor();
+                const id = `multiLineTextDiv${Object.keys(config.fields).length + 1}`;
+                let fieldId = id;
+                let suffix = 1;
+                while (config.fields[fieldId]) fieldId = `${id}_${suffix++}`;
+                config.fields[fieldId] = [];
+                selectedType = 'field';
+                selectedKey = fieldId;
+                renderSidebar();
+                renderEditor();
+            });
+            sidebar.querySelector('[data-add-multiple]').addEventListener('click', () => {
+                saveFromEditor();
+                config.fields.multiple.push({ name: 'Новая комплексная кнопка', fields: {} });
+                selectedType = 'multiple';
+                selectedMultipleIndex = config.fields.multiple.length - 1;
+                renderSidebar();
+                renderEditor();
+            });
+        };
+
+        const renderFieldEditor = () => {
+            if (!Array.isArray(config.fields[selectedKey])) config.fields[selectedKey] = [];
+            editorTitle.textContent = getFieldLabel(selectedKey);
+            const rows = config.fields[selectedKey].map((button, index) => `
+                <div data-button-index="${index}" style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:10px;background:#f8fafc;">
+                    <div style="display:grid;grid-template-columns:220px 1fr auto;gap:10px;align-items:start;">
+                        <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#334155;">Название
+                            <input data-name value="${escapeAttribute(button.name || '')}" style="padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#334155;">Текст
+                            <textarea data-text style="min-height:82px;resize:vertical;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(button.text || '')}</textarea>
+                        </label>
+                        <button type="button" data-delete-button="${index}" style="margin-top:20px;padding:8px 10px;border:none;background:#ef4444;color:white;border-radius:8px;cursor:pointer;">Удалить</button>
+                    </div>
+                </div>
+            `).join('');
+            editorBody.innerHTML = `
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <button type="button" data-add-button style="padding:9px 12px;border:none;background:#16a34a;color:white;border-radius:9px;cursor:pointer;">+ Кнопка</button>
+                    <button type="button" data-delete-field style="padding:9px 12px;border:1px solid #fecaca;background:#fff1f2;color:#be123c;border-radius:9px;cursor:pointer;">Удалить поле</button>
+                </div>
+                ${rows || '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;">Кнопок пока нет</div>'}
+            `;
+            editorBody.querySelector('[data-add-button]').addEventListener('click', () => {
+                saveFromEditor();
+                config.fields[selectedKey].push({ name: 'Новая', text: '' });
+                renderSidebar();
+                renderEditor();
+            });
+            editorBody.querySelector('[data-delete-field]').addEventListener('click', () => {
+                if (!confirm('Удалить поле и все его кнопки?')) return;
+                delete config.fields[selectedKey];
+                selectedKey = Object.keys(config.fields).find(key => key !== 'multiple') || 'multiLineTextDiv6';
+                if (!config.fields[selectedKey]) config.fields[selectedKey] = [];
+                renderSidebar();
+                renderEditor();
+            });
+            editorBody.querySelectorAll('[data-delete-button]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    saveFromEditor();
+                    config.fields[selectedKey].splice(Number(btn.dataset.deleteButton), 1);
+                    renderSidebar();
+                    renderEditor();
+                });
+            });
+        };
+
+        const renderMultipleEditor = () => {
+            const multiple = config.fields.multiple[selectedMultipleIndex] || { name: '', fields: {} };
+            if (!multiple.fields) multiple.fields = {};
+            editorTitle.textContent = 'Комплексная кнопка';
+            const fieldKeys = Object.keys(config.fields).filter(key => key !== 'multiple');
+            const fieldsMarkup = fieldKeys.map(key => `
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;margin-bottom:10px;">
+                    ${escapeHtml(getFieldLabel(key))}
+                    <textarea data-multiple-field="${escapeAttribute(key)}" style="min-height:86px;resize:vertical;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(multiple.fields[key] || '')}</textarea>
+                </label>
+            `).join('');
+            editorBody.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:12px;">
+                    <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;">Название
+                        <input data-multiple-name value="${escapeAttribute(multiple.name || '')}" style="padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                    </label>
+                    <button type="button" data-delete-multiple style="padding:9px 12px;border:1px solid #fecaca;background:#fff1f2;color:#be123c;border-radius:9px;cursor:pointer;">Удалить</button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(2, minmax(260px, 1fr));gap:12px;align-items:start;">
+                    ${fieldsMarkup || '<div style="padding:18px;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;">Нет полей для заполнения</div>'}
+                </div>
+            `;
+            editorBody.querySelector('[data-delete-multiple]').addEventListener('click', () => {
+                if (!confirm('Удалить комплексную кнопку?')) return;
+                config.fields.multiple.splice(selectedMultipleIndex, 1);
+                selectedMultipleIndex = Math.max(0, selectedMultipleIndex - 1);
+                selectedType = config.fields.multiple.length ? 'multiple' : 'field';
+                renderSidebar();
+                renderEditor();
+            });
+        };
+
+        const renderEditor = () => {
+            persistStatus();
+            if (selectedType === 'multiple') {
+                renderMultipleEditor();
+            } else {
+                renderFieldEditor();
+            }
+        };
+
+        modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => modal.remove()));
+        modal.querySelector('[data-download]').addEventListener('click', () => {
+            saveFromEditor();
+            downloadConfigBackup(JSON.stringify(config, null, 2));
         });
+        modal.querySelector('[data-upload]').addEventListener('click', () => uploadConfigBackup((text) => {
+            try {
+                config = JSON.parse(text);
+                if (!config.fields) config.fields = {};
+                if (!Array.isArray(config.fields.multiple)) config.fields.multiple = [];
+                selectedType = 'field';
+                selectedKey = Object.keys(config.fields).find(key => key !== 'multiple') || 'multiLineTextDiv6';
+                renderSidebar();
+                renderEditor();
+            } catch (e) {
+                alert('Не удалось открыть конфиг: ' + e.message);
+            }
+        }));
+        modal.querySelector('[data-reset]').addEventListener('click', () => {
+            if (!confirm('Вернуть стандартный конфиг? Текущие изменения в редакторе будут потеряны.')) return;
+            config = JSON.parse(DEFAULT_CAOP_CONFIG_TEXT);
+            selectedType = 'field';
+            selectedKey = Object.keys(config.fields).find(key => key !== 'multiple') || 'multiLineTextDiv6';
+            selectedMultipleIndex = 0;
+            renderSidebar();
+            renderEditor();
+        });
+        modal.querySelector('[data-save]').addEventListener('click', () => {
+            saveFromEditor();
+            saveConfigText(JSON.stringify(config, null, 2));
+            modal.remove();
+            if (SETTINGS.toolsMenuEnabled) {
+                createButtonsFromExternalConfig();
+            }
+            loadAndCreateFieldButtons({ force: true });
+        });
+
+        renderSidebar();
+        renderEditor();
+        makeFloatingPanelDraggable(modal, modal.querySelector('.caop-editor-header'));
     }
 
     function downloadConfigBackup(configText = localStorage.getItem(CONFIG_STORAGE_KEY) || '') {
