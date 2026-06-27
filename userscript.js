@@ -52,6 +52,15 @@
         toolsMenuEnabled: 'toolsMenuEnabled',
         editButtonsMode: 'editButtonsMode'
     };
+    const FIELD_LABELS = {
+        multiLineTextDiv6: 'Жалобы',
+        multiLineTextDiv1: 'Анамнез',
+        multiLineTextDiv2: 'Аллергии / наследственность',
+        singleLineTextInput8: 'Кожа',
+        multiLineTextDiv3: 'Осмотр / локальный статус',
+        multiLineTextDiv5: 'Диагноз / проведено',
+        multiLineTextDiv4: 'Рекомендации'
+    };
     let cachedConfigText = null;
     let targetContext = null;
     const SETTINGS = {
@@ -478,18 +487,118 @@
     }
 
     async function addFieldButton(fieldId) {
-        const name = prompt('Короткое название кнопки:');
-        if (!name) return;
-        const text = prompt('Текст для вставки:');
-        if (text === null) return;
+        openButtonEditorDialog({
+            fieldId,
+            title: `Новая кнопка: ${getFieldLabel(fieldId)}`,
+            onSave: async ({ name, text }) => {
+                const config = await loadLocalConfig();
+                if (!Array.isArray(config.fields[fieldId])) {
+                    config.fields[fieldId] = [];
+                }
+                config.fields[fieldId].push({ name, text });
+                saveConfigText(JSON.stringify(config, null, 2));
+                loadAndCreateFieldButtons({ force: true });
+            }
+        });
+    }
 
-        const config = await loadLocalConfig();
-        if (!Array.isArray(config.fields[fieldId])) {
-            config.fields[fieldId] = [];
-        }
-        config.fields[fieldId].push({ name, text });
-        saveConfigText(JSON.stringify(config, null, 2));
-        loadAndCreateFieldButtons({ force: true });
+    function getFieldLabel(fieldId) {
+        return FIELD_LABELS[fieldId] || fieldId;
+    }
+
+    function openButtonEditorDialog({ fieldId, title, initialName = '', initialText = '', onSave }) {
+        const oldDialog = document.getElementById('caopButtonEditorDialog');
+        if (oldDialog) oldDialog.remove();
+
+        const dialog = document.createElement('div');
+        dialog.id = 'caopButtonEditorDialog';
+        dialog.style.cssText = `
+            position: fixed;
+            top: 88px;
+            right: 88px;
+            z-index: 10002;
+            width: min(560px, calc(100vw - 120px));
+            background: #ffffff;
+            color: #1f2937;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        `;
+
+        dialog.innerHTML = `
+            <div class="caop-dialog-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#eef2ff;border-bottom:1px solid #c7d2fe;cursor:move;">
+                <div>
+                    <div style="font-weight:700;font-size:14px;">${escapeHtml(title)}</div>
+                    <div style="font-size:12px;color:#475569;">Окно не блокирует страницу: можно копировать текст из формы и продолжать работу.</div>
+                </div>
+                <button type="button" data-close style="border:none;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:#64748b;">×</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:12px;padding:14px;">
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;">
+                    Диалог 1: название кнопки
+                    <input data-name type="text" value="${escapeAttribute(initialName)}" placeholder="Напр.: СКТ" style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:#334155;">
+                    Диалог 2: текст для вставки
+                    <textarea data-text placeholder="Введите текст, который будет вставляться в поле" style="min-height:118px;resize:vertical;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:Arial,sans-serif;">${escapeHtml(initialText)}</textarea>
+                </label>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <span style="font-size:12px;color:#64748b;">Поле: ${escapeHtml(getFieldLabel(fieldId))}</span>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" data-close style="padding:8px 12px;border:1px solid #cbd5e1;background:white;border-radius:8px;cursor:pointer;">Отмена</button>
+                    <button type="button" data-save style="padding:8px 14px;border:none;background:#16a34a;color:white;border-radius:8px;cursor:pointer;font-weight:700;">Сохранить кнопку</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        const nameInput = dialog.querySelector('[data-name]');
+        const textInput = dialog.querySelector('[data-text]');
+        nameInput.focus();
+        dialog.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => dialog.remove()));
+        dialog.querySelector('[data-save]').addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            const text = textInput.value;
+            if (!name) {
+                nameInput.focus();
+                nameInput.style.borderColor = '#ef4444';
+                return;
+            }
+            await onSave({ name, text });
+            dialog.remove();
+        });
+        makeFloatingPanelDraggable(dialog, dialog.querySelector('.caop-dialog-header'));
+    }
+
+    function makeFloatingPanelDraggable(panel, handle) {
+        let startX = 0, startY = 0, startTop = 0, startLeft = 0, dragging = false;
+        handle.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return;
+            dragging = true;
+            const rect = panel.getBoundingClientRect();
+            startX = e.clientX; startY = e.clientY; startTop = rect.top; startLeft = rect.left;
+            panel.style.right = 'auto';
+            panel.style.left = `${startLeft}px`;
+            panel.style.top = `${startTop}px`;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            panel.style.left = `${Math.max(8, startLeft + e.clientX - startX)}px`;
+            panel.style.top = `${Math.max(8, startTop + e.clientY - startY)}px`;
+        });
+        document.addEventListener('mouseup', () => { dragging = false; });
+    }
+
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+    }
+
+    function escapeAttribute(value) {
+        return escapeHtml(value).replace(/'/g, '&#39;');
     }
 
     async function deleteFieldButton(fieldId, index) {
@@ -679,90 +788,116 @@
         modal.id = 'configEditorModal';
         modal.style.cssText = `
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
+            top: 72px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(1120px, calc(100vw - 36px));
+            max-height: calc(100vh - 96px);
+            background: #ffffff;
             z-index: 10001;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        `;
-
-        const content = document.createElement('div');
-        content.style.cssText = `
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 900px;
-            max-height: 90%;
+            border: 1px solid #cbd5e1;
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            overflow: hidden;
+            font-family: Arial, sans-serif;
         `;
 
-        const header = document.createElement('div');
-        header.textContent = 'Редактор CAOP-конфига';
-        header.style.cssText = 'font-weight: bold; font-size: 16px;';
+        const configText = await loadConfigText();
 
-        const textarea = document.createElement('textarea');
-        textarea.style.cssText = 'width: 100%; height: 60vh; font-family: monospace; font-size: 12px;';
-        textarea.value = await loadConfigText();
+        const content = document.createElement('div');
+        content.style.cssText = 'display: grid; grid-template-columns: 280px 1fr; min-height: 520px; max-height: calc(100vh - 96px);';
 
-        const buttonsRow = document.createElement('div');
-        buttonsRow.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+        const sidebar = document.createElement('div');
+        sidebar.style.cssText = 'background:#f8fafc;border-right:1px solid #e2e8f0;padding:16px;overflow:auto;';
+        sidebar.innerHTML = `
+            <div style="font-weight:800;font-size:16px;margin-bottom:6px;">Редактор CAOP</div>
+            <div style="font-size:12px;color:#64748b;line-height:1.4;margin-bottom:14px;">Настраивайте быстрые фразы и комплексные шаблоны. Окно не блокирует страницу — можно сверяться с полями пациента.</div>
+            <div data-summary style="display:flex;flex-direction:column;gap:8px;"></div>
+            <button type="button" data-format style="width:100%;margin-top:14px;padding:9px 10px;border:1px solid #cbd5e1;background:white;border-radius:8px;cursor:pointer;">Форматировать JSON</button>
+            <button type="button" data-reset style="width:100%;margin-top:8px;padding:9px 10px;border:1px solid #fecaca;background:#fff1f2;color:#be123c;border-radius:8px;cursor:pointer;">Вернуть стандартный конфиг</button>
+        `;
 
-        const downloadButton = document.createElement('button');
-        downloadButton.textContent = 'Скачать бэкап';
-        downloadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        downloadButton.addEventListener('click', () => downloadConfigBackup(textarea.value));
+        const main = document.createElement('div');
+        main.style.cssText = 'display:flex;flex-direction:column;min-width:0;';
+        main.innerHTML = `
+            <div class="caop-editor-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:#eef2ff;border-bottom:1px solid #c7d2fe;cursor:move;">
+                <div>
+                    <div style="font-weight:800;font-size:16px;color:#1e293b;">JSON-конфигурация шаблонов</div>
+                    <div data-status style="font-size:12px;color:#475569;margin-top:2px;">Проверка JSON...</div>
+                </div>
+                <button type="button" data-close style="border:none;background:transparent;font-size:24px;line-height:1;cursor:pointer;color:#64748b;">×</button>
+            </div>
+            <textarea data-config style="flex:1;min-height:420px;width:100%;box-sizing:border-box;border:none;outline:none;padding:14px;font-family:Consolas, Monaco, monospace;font-size:13px;line-height:1.45;resize:none;"></textarea>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button type="button" data-download style="padding:8px 12px;background:#3F51B5;color:white;border:none;border-radius:8px;cursor:pointer;">Скачать бэкап</button>
+                    <button type="button" data-upload style="padding:8px 12px;background:#3F51B5;color:white;border:none;border-radius:8px;cursor:pointer;">Загрузить бэкап</button>
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button type="button" data-close style="padding:8px 12px;background:#777;color:white;border:none;border-radius:8px;cursor:pointer;">Отмена</button>
+                    <button type="button" data-save style="padding:8px 14px;background:#4CAF50;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Сохранить</button>
+                </div>
+            </div>
+        `;
 
-        const uploadButton = document.createElement('button');
-        uploadButton.textContent = 'Загрузить бэкап';
-        uploadButton.style.cssText = 'padding: 8px 16px; background: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        uploadButton.addEventListener('click', () => uploadConfigBackup((text) => {
-            textarea.value = text;
-        }));
-
-        const saveButton = document.createElement('button');
-        saveButton.textContent = 'Сохранить';
-        saveButton.style.cssText = 'padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        saveButton.addEventListener('click', () => {
-            try {
-                JSON.parse(textarea.value);
-                saveConfigText(textarea.value);
-                modal.remove();
-                if (SETTINGS.toolsMenuEnabled) {
-                    createButtonsFromExternalConfig();
-                }
-                loadAndCreateFieldButtons({ force: true });
-            } catch (e) {
-                alert('Некорректный JSON: ' + e.message);
-            }
-        });
-
-        const cancelButton = document.createElement('button');
-        cancelButton.textContent = 'Отмена';
-        cancelButton.style.cssText = 'padding: 8px 16px; background: #777; color: white; border: none; border-radius: 4px; cursor: pointer;';
-        cancelButton.addEventListener('click', () => modal.remove());
-
-        buttonsRow.appendChild(cancelButton);
-        buttonsRow.appendChild(downloadButton);
-        buttonsRow.appendChild(uploadButton);
-        buttonsRow.appendChild(saveButton);
-
-        content.appendChild(header);
-        content.appendChild(textarea);
-        content.appendChild(buttonsRow);
+        content.appendChild(sidebar);
+        content.appendChild(main);
         modal.appendChild(content);
         document.body.appendChild(modal);
 
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) modal.remove();
+        const textarea = modal.querySelector('[data-config]');
+        const status = modal.querySelector('[data-status]');
+        const summary = modal.querySelector('[data-summary]');
+        textarea.value = configText;
+
+        const refreshSummary = () => {
+            try {
+                const cfg = JSON.parse(textarea.value);
+                const fields = cfg.fields || {};
+                const simpleFields = Object.keys(fields).filter(key => key !== 'multiple');
+                const multipleCount = Array.isArray(fields.multiple) ? fields.multiple.length : 0;
+                status.textContent = 'JSON корректен. Можно сохранять.';
+                status.style.color = '#15803d';
+                summary.innerHTML = simpleFields.map(key => {
+                    const count = Array.isArray(fields[key]) ? fields[key].length : 0;
+                    return `<div style="padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:white;"><b>${escapeHtml(getFieldLabel(key))}</b><br><span style="font-size:12px;color:#64748b;">${count} быстрых кнопок</span></div>`;
+                }).join('') + `<div style="padding:8px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;"><b>Комплексные шаблоны</b><br><span style="font-size:12px;color:#1d4ed8;">${multipleCount} кнопок</span></div>`;
+                return cfg;
+            } catch (e) {
+                status.textContent = 'Ошибка JSON: ' + e.message;
+                status.style.color = '#dc2626';
+                return null;
+            }
+        };
+
+        textarea.addEventListener('input', refreshSummary);
+        refreshSummary();
+
+        modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => modal.remove()));
+        modal.querySelector('[data-download]').addEventListener('click', () => downloadConfigBackup(textarea.value));
+        modal.querySelector('[data-upload]').addEventListener('click', () => uploadConfigBackup((text) => { textarea.value = text; refreshSummary(); }));
+        modal.querySelector('[data-format]').addEventListener('click', () => {
+            const cfg = refreshSummary();
+            if (cfg) textarea.value = JSON.stringify(cfg, null, 2);
+            refreshSummary();
         });
+        modal.querySelector('[data-reset]').addEventListener('click', () => {
+            textarea.value = DEFAULT_CAOP_CONFIG_TEXT;
+            refreshSummary();
+        });
+        modal.querySelector('[data-save]').addEventListener('click', () => {
+            const cfg = refreshSummary();
+            if (!cfg) return;
+            saveConfigText(JSON.stringify(cfg, null, 2));
+            modal.remove();
+            if (SETTINGS.toolsMenuEnabled) {
+                createButtonsFromExternalConfig();
+            }
+            loadAndCreateFieldButtons({ force: true });
+        });
+        makeFloatingPanelDraggable(modal, modal.querySelector('.caop-editor-header'));
     }
 
     function downloadConfigBackup(configText = localStorage.getItem(CONFIG_STORAGE_KEY) || '') {
